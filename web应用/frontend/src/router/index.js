@@ -34,31 +34,31 @@ const router = createRouter({
     {
       path: '/backtest',
       name: 'backtest',
-      component: () => import('@/views/BacktestView.vue'),
+      component: () => import('@/views/SimpleBacktestView.vue'),
       meta: {
         title: '策略回测',
         icon: 'DataAnalysis',
-        requiresAuth: true
+        requiresAuth: false
       }
     },
     {
       path: '/analysis',
       name: 'analysis',
-      component: () => import('@/views/AnalysisView.vue'),
+      component: () => import('@/views/SimpleAnalysisView.vue'),
       meta: {
         title: '结果分析',
         icon: 'PieChart',
-        requiresAuth: true
+        requiresAuth: false
       }
     },
     {
       path: '/settings',
       name: 'settings',
-      component: () => import('@/views/SettingsView.vue'),
+      component: () => import('@/views/SimpleSettingsView.vue'),
       meta: {
         title: '系统设置',
         icon: 'Setting',
-        requiresAuth: true
+        requiresAuth: false
       }
     },
     {

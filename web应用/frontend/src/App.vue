@@ -7,30 +7,9 @@
 <script setup>
 import { onMounted } from 'vue'
 
-onMounted(async () => {
+onMounted(() => {
   console.log('App mounted successfully')
-
-  // 延迟初始化stores，避免阻塞页面渲染
-  try {
-    const { useSystemStore } = await import('@/stores/system')
-    const { useAuthStore } = await import('@/stores/auth')
-
-    const systemStore = useSystemStore()
-    const authStore = useAuthStore()
-
-    // 初始化认证状态
-    await authStore.initAuth()
-
-    // 初始化系统信息
-    systemStore.fetchSystemInfo()
-
-    // 初始化主题
-    systemStore.initTheme()
-
-    console.log('Stores initialized successfully')
-  } catch (error) {
-    console.error('Failed to initialize stores:', error)
-  }
+  // 暂时禁用stores初始化，避免后端连接问题影响页面显示
 })
 </script>
 

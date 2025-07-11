@@ -12,12 +12,21 @@
     
     <div class="content">
       <div class="chart-container">
-        <h2>K线图表</h2>
-        <div class="chart-placeholder">
-          <p>这里将显示实时K线图表</p>
-          <p>支持多时间周期：1分钟、5分钟、15分钟、1小时、4小时、1天</p>
-          <p>数据范围：2019-11-01 到 2025-06-15</p>
+        <div class="chart-header">
+          <h2>K线图表</h2>
+          <div class="chart-controls">
+            <el-select v-model="selectedTimeframe" @change="changeTimeframe" size="small">
+              <el-option label="1分钟" value="1m" />
+              <el-option label="5分钟" value="5m" />
+              <el-option label="15分钟" value="15m" />
+              <el-option label="1小时" value="1h" />
+              <el-option label="4小时" value="4h" />
+              <el-option label="1天" value="1d" />
+            </el-select>
+            <el-button @click="refreshChart" size="small">刷新</el-button>
+          </div>
         </div>
+        <div ref="chartContainer" class="chart-content"></div>
       </div>
       
       <div class="info-panel">
@@ -34,15 +43,134 @@
 </template>
 
 <script setup>
+import { ref, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
+import { createChart } from 'lightweight-charts'
 
 const router = useRouter()
+const chartContainer = ref()
+const selectedTimeframe = ref('1h')
+
+let chart = null
+let candlestickSeries = null
+
+// 模拟K线数据
+const generateMockData = () => {
+  const data = []
+  const basePrice = 3456.78
+  let currentPrice = basePrice
+  const now = new Date()
+
+  for (let i = 100; i >= 0; i--) {
+    const time = new Date(now.getTime() - i * 60 * 60 * 1000) // 每小时一根K线
+    const change = (Math.random() - 0.5) * 100 // 随机变化
+
+    const open = currentPrice
+    const close = open + change
+    const high = Math.max(open, close) + Math.random() * 50
+    const low = Math.min(open, close) - Math.random() * 50
+
+    data.push({
+      time: Math.floor(time.getTime() / 1000),
+      open: parseFloat(open.toFixed(2)),
+      high: parseFloat(high.toFixed(2)),
+      low: parseFloat(low.toFixed(2)),
+      close: parseFloat(close.toFixed(2))
+    })
+
+    currentPrice = close
+  }
+
+  return data.sort((a, b) => a.time - b.time)
+}
+
+const initChart = () => {
+  if (!chartContainer.value) return
+
+  // 创建图表
+  chart = createChart(chartContainer.value, {
+    width: chartContainer.value.clientWidth,
+    height: 400,
+    layout: {
+      background: { color: '#ffffff' },
+      textColor: '#333333',
+    },
+    grid: {
+      vertLines: { color: '#f0f0f0' },
+      horzLines: { color: '#f0f0f0' },
+    },
+    crosshair: {
+      mode: 1,
+    },
+    rightPriceScale: {
+      borderColor: '#cccccc',
+    },
+    timeScale: {
+      borderColor: '#cccccc',
+      timeVisible: true,
+      secondsVisible: false,
+    },
+  })
+
+  // 创建K线系列
+  candlestickSeries = chart.addCandlestickSeries({
+    upColor: '#02c076',
+    downColor: '#f84960',
+    borderDownColor: '#f84960',
+    borderUpColor: '#02c076',
+    wickDownColor: '#f84960',
+    wickUpColor: '#02c076',
+  })
+
+  // 设置数据
+  const data = generateMockData()
+  candlestickSeries.setData(data)
+
+  // 自适应大小
+  chart.timeScale().fitContent()
+}
+
+const changeTimeframe = (timeframe) => {
+  ElMessage.info(`切换到 ${timeframe} 时间周期`)
+  // 这里可以重新加载对应时间周期的数据
+  refreshChart()
+}
+
+const refreshChart = () => {
+  if (candlestickSeries) {
+    const newData = generateMockData()
+    candlestickSeries.setData(newData)
+    chart.timeScale().fitContent()
+    ElMessage.success('图表已刷新')
+  }
+}
 
 const handleLogout = () => {
   ElMessage.success('退出登录成功')
   router.push('/login')
 }
+
+// 响应式调整图表大小
+const handleResize = () => {
+  if (chart && chartContainer.value) {
+    chart.applyOptions({
+      width: chartContainer.value.clientWidth,
+    })
+  }
+}
+
+onMounted(() => {
+  initChart()
+  window.addEventListener('resize', handleResize)
+})
+
+onUnmounted(() => {
+  if (chart) {
+    chart.remove()
+  }
+  window.removeEventListener('resize', handleResize)
+})
 </script>
 
 <style scoped>
@@ -82,15 +210,24 @@ const handleLogout = () => {
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
-.chart-placeholder {
-  height: 400px;
-  border: 2px dashed #ddd;
+.chart-header {
   display: flex;
-  flex-direction: column;
-  justify-content: center;
+  justify-content: space-between;
   align-items: center;
-  color: #666;
-  margin-top: 20px;
+  margin-bottom: 20px;
+}
+
+.chart-controls {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.chart-content {
+  width: 100%;
+  height: 400px;
+  border-radius: 4px;
+  overflow: hidden;
 }
 
 .info-panel {
