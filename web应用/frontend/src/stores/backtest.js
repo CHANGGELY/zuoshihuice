@@ -1,0 +1,200 @@
+import { defineStore } from 'pinia'
+import { ref, computed } from 'vue'
+import { backtestService } from '@/services/backtest'
+
+export const useBacktestStore = defineStore('backtest', () => {
+  // 状态
+  const backtestResults = ref([])
+  const currentResult = ref(null)
+  const backtestConfigs = ref([])
+  const loading = ref(false)
+  const error = ref(null)
+  
+  // 当前运行的回测
+  const runningBacktests = ref(new Map())
+  
+  // 计算属性
+  const latestResult = computed(() => {
+    return backtestResults.value.length > 0 ? backtestResults.value[0] : null
+  })
+  
+  const completedResults = computed(() => {
+    return backtestResults.value.filter(result => result.status === 'completed')
+  })
+  
+  const runningResults = computed(() => {
+    return backtestResults.value.filter(result => result.status === 'running')
+  })
+  
+  // 运行回测
+  const runBacktest = async (params) => {
+    try {
+      loading.value = true
+      error.value = null
+      
+      const response = await backtestService.runBacktest(params)
+      const resultId = response.data.result_id
+      
+      // 添加到运行中的回测列表
+      runningBacktests.value.set(resultId, {
+        id: resultId,
+        status: 'running',
+        startTime: new Date(),
+        params
+      })
+      
+      // 开始轮询状态
+      pollBacktestStatus(resultId)
+      
+      return response.data
+    } catch (err) {
+      error.value = err.message
+      throw err
+    } finally {
+      loading.value = false
+    }
+  }
+  
+  // 轮询回测状态
+  const pollBacktestStatus = async (resultId) => {
+    const maxAttempts = 300 // 最多轮询5分钟
+    let attempts = 0
+    
+    const poll = async () => {
+      try {
+        if (attempts >= maxAttempts) {
+          runningBacktests.value.delete(resultId)
+          return
+        }
+        
+        const response = await backtestService.getBacktestStatus(resultId)
+        const status = response.data.status
+        
+        // 更新运行状态
+        if (runningBacktests.value.has(resultId)) {
+          const backtest = runningBacktests.value.get(resultId)
+          backtest.status = status
+          runningBacktests.value.set(resultId, backtest)
+        }
+        
+        if (status === 'completed' || status === 'failed') {
+          // 回测完成，获取结果
+          await fetchBacktestResult(resultId)
+          runningBacktests.value.delete(resultId)
+        } else if (status === 'running') {
+          // 继续轮询
+          attempts++
+          setTimeout(poll, 2000) // 2秒后再次轮询
+        }
+      } catch (err) {
+        console.error('轮询回测状态失败:', err)
+        runningBacktests.value.delete(resultId)
+      }
+    }
+    
+    poll()
+  }
+  
+  // 获取回测结果列表
+  const fetchBacktestResults = async () => {
+    try {
+      loading.value = true
+      error.value = null
+      
+      const response = await backtestService.getBacktestResults()
+      backtestResults.value = response.data.results || []
+      
+      return response.data
+    } catch (err) {
+      error.value = err.message
+      throw err
+    } finally {
+      loading.value = false
+    }
+  }
+  
+  // 获取特定回测结果
+  const fetchBacktestResult = async (resultId) => {
+    try {
+      const response = await backtestService.getBacktestResult(resultId)
+      const result = response.data
+      
+      // 更新当前结果
+      currentResult.value = result
+      
+      // 更新结果列表
+      const index = backtestResults.value.findIndex(r => r.id === resultId)
+      if (index >= 0) {
+        backtestResults.value[index] = result
+      } else {
+        backtestResults.value.unshift(result)
+      }
+      
+      return result
+    } catch (err) {
+      error.value = err.message
+      throw err
+    }
+  }
+  
+  // 获取回测配置
+  const fetchBacktestConfigs = async () => {
+    try {
+      const response = await backtestService.getBacktestConfigs()
+      backtestConfigs.value = response.data || []
+      return response.data
+    } catch (err) {
+      error.value = err.message
+      throw err
+    }
+  }
+  
+  // 保存回测配置
+  const saveBacktestConfig = async (config) => {
+    try {
+      const response = await backtestService.saveBacktestConfig(config)
+      
+      // 更新配置列表
+      backtestConfigs.value.unshift(response.data)
+      
+      return response.data
+    } catch (err) {
+      error.value = err.message
+      throw err
+    }
+  }
+  
+  // 设置当前结果
+  const setCurrentResult = (result) => {
+    currentResult.value = result
+  }
+  
+  // 清除错误
+  const clearError = () => {
+    error.value = null
+  }
+  
+  return {
+    // 状态
+    backtestResults,
+    currentResult,
+    backtestConfigs,
+    loading,
+    error,
+    runningBacktests,
+    
+    // 计算属性
+    latestResult,
+    completedResults,
+    runningResults,
+    
+    // 方法
+    runBacktest,
+    fetchBacktestResults,
+    fetchBacktestResult,
+    fetchBacktestConfigs,
+    saveBacktestConfig,
+    setCurrentResult,
+    clearError
+  }
+})

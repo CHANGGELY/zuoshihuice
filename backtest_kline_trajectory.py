@@ -24,9 +24,9 @@ BACKTEST_CONFIG = {
 }
 
 MARKET_CONFIG = {
-    "trading_pair": "ETH-USDT",
-    "base_asset": "ETH", 
-    "quote_asset": "USDT",
+    "trading_pair": "ETH-USDC",
+    "base_asset": "ETH",
+    "quote_asset": "USDC",
     "contract_size": Decimal("1"),  # 合约乘数 (1张合约 = 1 ETH，与币安U本位永续合约一致)
     "min_order_size": Decimal("0.009"),  # 最小下单量 (ETH) - 根据您的要求更新
     "maker_fee": Decimal("0.0002"),  # 挂单手续费 0.02%
@@ -34,10 +34,10 @@ MARKET_CONFIG = {
 }
 
 STRATEGY_CONFIG = {
-    "leverage": 125,  # 杠杆倍数
+    "leverage": 125,  # 杠杆倍数 (降低杠杆测试币安标准)
     "position_mode": "Hedge",  # 对冲模式
-    "bid_spread": Decimal("0.0015"),  # 0.15% 买单价差 (测试中等价差)
-    "ask_spread": Decimal("0.0015"),  # 0.15% 卖单价差
+    "bid_spread": Decimal("0.002"),  # 0.2% 买单价差 (增加价差)
+    "ask_spread": Decimal("0.002"),  # 0.2% 卖单价差
 
     # 动态下单量配置
     "use_dynamic_order_size": True,  # 是否使用动态下单量
@@ -45,7 +45,7 @@ STRATEGY_CONFIG = {
     "min_order_amount": Decimal("0.008"),   # 最小下单数量 (ETH)
     "max_order_amount": Decimal("99.0"),    # 最大下单数量 (ETH) - 大幅降低
 
-    # 删除硬编码的max_position_size，改为完全动态计算
+    # 🚀 币安标准：杠杆选择用总持仓，爆仓检查用净持仓，恢复80%比例
     "max_position_value_ratio": Decimal("0.8"),  # 最大仓位价值不超过权益的80%
     "order_refresh_time": 30.0,  # 订单刷新时间(秒)
     # 删除资金费率配置，因为数据中没有资金费率
@@ -56,17 +56,21 @@ STRATEGY_CONFIG = {
 }
 
 # =====================================================================================
-# 📈 币安ETHUSDT阶梯保证金表 (根据用户提供的图片更新)
-# 格式: (仓位价值上限USDT, 最大杠杆倍数, 维持保证金率, 额外维持保证金)
+# 📈 币安ETHUSDC阶梯保证金表 (根据用户最新提供的图片更新)
+# 格式: (仓位价值上限USDT, 最大杠杆倍数, 维持保证金率, 维持保证金速算额)
 # =====================================================================================
-ETH_USDT_TIERS = [
-    (5000, 125, Decimal("0.004"), Decimal("0")),           # 0-5,000 USDT: 125x杠杆, 0.40%维持保证金
-    (25000, 100, Decimal("0.005"), Decimal("25")),         # 5,001-25,000 USDT: 100x杠杆, 0.50%维持保证金
-    (100000, 50, Decimal("0.01"), Decimal("150")),         # 25,001-100,000 USDT: 50x杠杆, 1.00%维持保证金
-    (250000, 25, Decimal("0.025"), Decimal("1650")),       # 100,001-250,000 USDT: 25x杠杆, 2.50%维持保证金
-    (1000000, 10, Decimal("0.05"), Decimal("7900")),       # 250,001-1,000,000 USDT: 10x杠杆, 5.00%维持保证金
-    (2000000, 5, Decimal("0.1"), Decimal("57900")),        # 1,000,001-2,000,000 USDT: 5x杠杆, 10.00%维持保证金
-    (Decimal('Infinity'), 2, Decimal("0.125"), Decimal("107900"))  # >2,000,000 USDT: 2x杠杆, 12.50%维持保证金
+ETH_USDC_TIERS = [
+    (50000, 125, Decimal("0.004"), Decimal("0")),           # 0-50,000 USDT: 125x杠杆, 0.40%维持保证金
+    (500000, 100, Decimal("0.005"), Decimal("50")),         # 50,001-500,000 USDT: 100x杠杆, 0.50%维持保证金
+    (1000000, 75, Decimal("0.0065"), Decimal("800")),       # 500,001-1,000,000 USDT: 75x杠杆, 0.65%维持保证金
+    (5000000, 50, Decimal("0.01"), Decimal("4300")),        # 1,000,001-5,000,000 USDT: 50x杠杆, 1.00%维持保证金
+    (50000000, 20, Decimal("0.02"), Decimal("54300")),      # 5,000,001-50,000,000 USDT: 20x杠杆, 2.00%维持保证金
+    (100000000, 10, Decimal("0.05"), Decimal("1554300")),   # 50,000,001-100,000,000 USDT: 10x杠杆, 5.00%维持保证金
+    (150000000, 5, Decimal("0.1"), Decimal("6554300")),     # 100,000,001-150,000,000 USDT: 5x杠杆, 10.00%维持保证金
+    (300000000, 4, Decimal("0.125"), Decimal("10304300")),  # 150,000,001-300,000,000 USDT: 4x杠杆, 12.50%维持保证金
+    (400000000, 3, Decimal("0.15"), Decimal("17804300")),   # 300,000,001-400,000,000 USDT: 3x杠杆, 15.00%维持保证金
+    (500000000, 2, Decimal("0.25"), Decimal("57804300")),   # 400,000,001-500,000,000 USDT: 2x杠杆, 25.00%维持保证金
+    (Decimal('Infinity'), 1, Decimal("0.5"), Decimal("182804300"))  # >500,000,000 USDT: 1x杠杆, 50.00%维持保证金
 ]
 
 # =====================================================================================
@@ -96,12 +100,15 @@ class FastPerpetualExchange:
         # 账户余额
         self.balance = Decimal(str(initial_balance))
         self.margin_balance = Decimal(str(initial_balance))
-        
+
         # 仓位信息
         self.long_position = Decimal("0")
         self.short_position = Decimal("0")
         self.long_entry_price = Decimal("0")
         self.short_entry_price = Decimal("0")
+
+        # 🚀 当前有效杠杆 (用于交易记录)
+        self.current_leverage = STRATEGY_CONFIG["leverage"]
         
         # 市场信息
         self.current_price = Decimal("0")
@@ -125,47 +132,66 @@ class FastPerpetualExchange:
         return self.balance + self.get_unrealized_pnl()
 
     def get_used_margin(self) -> Decimal:
-        """获取已用保证金 - 使用动态杠杆"""
-        # 获取当前档位的最大杠杆倍数
+        """🚀 币安标准：获取已用保证金 - 优先使用高杠杆，提高资金使用率"""
+        # 获取当前档位的最大杠杆倍数 (基于总持仓价值)
         current_max_leverage = self.get_current_max_leverage()
 
-        # 使用当前档位的杠杆倍数，但不超过初始设置的杠杆
+        # 🚀 优先选择高杠杆：使用当前档位允许的最高杠杆，但不超过初始设置
         effective_leverage = min(current_max_leverage, STRATEGY_CONFIG["leverage"])
 
         if effective_leverage == 0:
             return Decimal("0")
 
+        # 🚀 保证金计算：总持仓价值 / 有效杠杆
         long_value = self.long_position * self.long_entry_price
         short_value = self.short_position * self.short_entry_price
-        return (long_value + short_value) / Decimal(str(effective_leverage))
+        total_position_value = long_value + short_value
+        return total_position_value / Decimal(str(effective_leverage))
 
     def get_available_margin(self) -> Decimal:
         """获取可用保证金"""
         return self.get_equity() - self.get_used_margin()
 
     def get_current_leverage_tier(self) -> tuple:
-        """根据当前仓位价值获取对应的杠杆档位信息"""
-        position_value = self.get_position_value()
+        """🚀 币安标准：根据总持仓价值获取对应的杠杆档位，优先选择高杠杆"""
+        total_position_value = self.get_position_value()  # 现在是总持仓价值
 
-        for threshold, max_leverage, mm_rate, fixed_amount in ETH_USDT_TIERS:
-            if position_value <= threshold:
+        # 🚀 优先选择高杠杆：从最高杠杆开始检查
+        for threshold, max_leverage, mm_rate, fixed_amount in ETH_USDC_TIERS:
+            if total_position_value <= threshold:
                 return threshold, max_leverage, mm_rate, fixed_amount
 
-        # 默认返回最高档位
-        return ETH_USDT_TIERS[-1]
+        # 默认返回最低档位 (超出所有限制时)
+        return ETH_USDC_TIERS[-1]
 
     def get_current_max_leverage(self) -> int:
         """获取当前仓位价值对应的最大杠杆倍数"""
         _, max_leverage, _, _ = self.get_current_leverage_tier()
         return max_leverage
 
-    def get_maintenance_margin(self) -> Decimal:
-        """根据阶梯保证金制度，动态计算所需的维持保证金"""
-        position_value = self.get_position_value()
+    def update_current_leverage(self):
+        """🚀 更新当前有效杠杆 (用于交易记录)"""
+        old_leverage = self.current_leverage
+        current_max_leverage = self.get_current_max_leverage()
+        new_leverage = min(current_max_leverage, STRATEGY_CONFIG["leverage"])
 
-        for threshold, max_leverage, mm_rate, fixed_amount in ETH_USDT_TIERS:
-            if position_value <= threshold:
-                return position_value * mm_rate + fixed_amount
+        # 🚀 杠杆变化时记录 (用于调试)
+        if new_leverage != old_leverage:
+            total_pos_value = self.get_position_value()
+            print(f"🔄 杠杆调整: {old_leverage}x → {new_leverage}x (总持仓价值: {total_pos_value:.2f} USDT)")
+
+        self.current_leverage = new_leverage
+
+    def get_maintenance_margin(self) -> Decimal:
+        """🚀 币安标准：根据净持仓价值计算维持保证金 (爆仓风险评估)
+        公式: 维持保证金 = 仓位名义价值 × 维持保证金率 - 维持保证金速算额
+        """
+        net_position_value = self.get_net_position_value()  # 使用净持仓价值
+
+        for threshold, max_leverage, mm_rate, maintenance_amount in ETH_USDC_TIERS:
+            if net_position_value <= threshold:
+                # 🚀 修正：使用减号，符合币安公式
+                return net_position_value * mm_rate - maintenance_amount
         return Decimal("0")  # 默认情况
 
     def check_and_handle_liquidation(self, timestamp: int) -> bool:
@@ -239,8 +265,15 @@ class FastPerpetualExchange:
         return self.long_position - self.short_position
     
     def get_position_value(self) -> Decimal:
+        """🚀 币安标准：计算总持仓价值 (多仓价值 + 空仓价值) - 用于杠杆选择"""
+        long_value = self.long_position * self.current_price
+        short_value = self.short_position * self.current_price
+        return long_value + short_value  # 总持仓价值，用于杠杆档位判断
+
+    def get_net_position_value(self) -> Decimal:
+        """🚀 计算净持仓价值 (风险敞口) - 用于爆仓检查"""
         net_pos = self.get_net_position()
-        return abs(net_pos) * self.current_price
+        return abs(net_pos) * self.current_price  # 净持仓价值，用于爆仓风险评估
     
     def get_unrealized_pnl(self) -> Decimal:
         pnl = Decimal("0")
@@ -352,10 +385,13 @@ class FastPerpetualExchange:
             self.short_position -= trade_amount
             if self.short_position == 0:
                 self.short_entry_price = Decimal("0")
-        
+
+        # 🚀 更新当前杠杆 (用于交易记录)
+        self.update_current_leverage()
+
         trade_record = {
-            "timestamp": timestamp, "side": side, "amount": amount, 
-            "price": price, "fee": fee, "pnl": pnl
+            "timestamp": timestamp, "side": side, "amount": amount,
+            "price": price, "fee": fee, "pnl": pnl, "leverage": self.current_leverage
         }
         self.trade_history.append(trade_record)
         self.order_id_counter += 1
@@ -555,10 +591,10 @@ class FastPerpetualStrategy:
         # 转换为ETH数量 - 这就是最终的最大仓位限制
         max_position_size = max_position_value_in_tier / current_price
 
-        # 3. 检查总仓位风险
+        # 🚀 币安标准：检查总仓位风险 (多仓价值 + 空仓价值)
         total_position_value = (long_pos + short_pos) * current_price
         if total_position_value > max_position_value_in_tier:
-            # 仓位过大，暂停开仓
+            # 总持仓价值过大，暂停开仓 (符合币安阶梯保证金规则)
             return []
 
         # --- 开仓逻辑 (基于动态杠杆) ---
@@ -1137,7 +1173,9 @@ async def run_fast_perpetual_backtest(use_cache: bool = True):
         print(f"\n最近5笔交易:")
         for i, trade in enumerate(exchange.trade_history[-5:], 1):
             side_cn = trade_side_translation.get(trade['side'].upper(), trade['side'])
-            print(f"  {i}. {side_cn} {trade['amount']:.4f} ETH @ {trade['price']:.2f} USDT (手续费: {trade['fee']:.4f})")
+            # 🚀 添加杠杆信息
+            leverage_info = f" [杠杆: {trade.get('leverage', 'N/A')}x]" if 'leverage' in trade else ""
+            print(f"  {i}. {side_cn} {trade['amount']:.4f} ETH @ {trade['price']:.2f} USDT (手续费: {trade['fee']:.4f}){leverage_info}")
     
     # 5. 计算并绘制性能指标
     analyze_and_plot_performance(
@@ -1156,6 +1194,26 @@ async def run_fast_perpetual_backtest(use_cache: bool = True):
     final_equity = exchange.get_equity()
     total_return = (final_equity - Decimal(str(BACKTEST_CONFIG["initial_balance"]))) / Decimal(str(BACKTEST_CONFIG["initial_balance"]))
 
+    # 🚀 为可视化准备交易数据
+    trades_for_visualization = []
+    trade_side_translation = {
+        "BUY_LONG": "买入开多",
+        "SELL_SHORT": "卖出开空",
+        "SELL_LONG": "卖出平多",
+        "BUY_SHORT": "买入平空"
+    }
+
+    for trade in exchange.trade_history:
+        trades_for_visualization.append({
+            "timestamp": trade.get('timestamp', 0),
+            "action": trade_side_translation.get(trade['side'].upper(), trade['side']),
+            "side": trade['side'],
+            "amount": trade['amount'],
+            "price": trade['price'],
+            "fee": trade['fee'],
+            "leverage": trade.get('leverage', 'N/A')
+        })
+
     return {
         "final_equity": float(final_equity),
         "total_return": float(total_return),
@@ -1166,7 +1224,9 @@ async def run_fast_perpetual_backtest(use_cache: bool = True):
         "liquidated": liquidated,
         "stopped_by_risk": stopped_by_risk,
         "start_date": start_date_str,
-        "end_date": end_date_str
+        "end_date": end_date_str,
+        "trades": trades_for_visualization,  # 🚀 添加交易数据供可视化使用
+        "equity_history": [(timestamp, float(equity)) for timestamp, equity in exchange.equity_history]  # 权益曲线
     }
 
 if __name__ == "__main__":
