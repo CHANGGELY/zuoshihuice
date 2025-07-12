@@ -11,31 +11,83 @@
     </div>
     
     <div class="content">
-      <div class="chart-container">
-        <div class="chart-header">
-          <h2>K线图表</h2>
-          <div class="chart-controls">
-            <el-select v-model="selectedTimeframe" @change="changeTimeframe" size="small">
-              <el-option label="1分钟" value="1m" />
-              <el-option label="5分钟" value="5m" />
-              <el-option label="15分钟" value="15m" />
-              <el-option label="1小时" value="1h" />
-              <el-option label="4小时" value="4h" />
-              <el-option label="1天" value="1d" />
-            </el-select>
-            <el-button @click="refreshChart" size="small">刷新</el-button>
+      <div class="chart-section">
+        <h2>K线图表</h2>
+        <div class="chart-controls">
+          <el-select v-model="selectedTimeframe" @change="changeTimeframe" placeholder="选择时间周期">
+            <el-option
+              v-for="tf in timeframes"
+              :key="tf.value"
+              :label="tf.label"
+              :value="tf.value"
+            />
+          </el-select>
+          <el-button @click="refreshData">刷新</el-button>
+        </div>
+
+        <div class="chart-container">
+          <div ref="chartContainer" style="width: 100%; height: 400px;"></div>
+
+          <!-- 鼠标悬停信息 -->
+          <div v-if="hoverInfo.visible" class="hover-info">
+            <div class="hover-info-header">
+              <strong>{{ hoverInfo.time }}</strong>
+            </div>
+            <div class="hover-info-content">
+              <div class="info-row">
+                <span>开盘:</span>
+                <span>${{ hoverInfo.open.toFixed(2) }}</span>
+              </div>
+              <div class="info-row">
+                <span>最高:</span>
+                <span>${{ hoverInfo.high.toFixed(2) }}</span>
+              </div>
+              <div class="info-row">
+                <span>最低:</span>
+                <span>${{ hoverInfo.low.toFixed(2) }}</span>
+              </div>
+              <div class="info-row">
+                <span>收盘:</span>
+                <span>${{ hoverInfo.close.toFixed(2) }}</span>
+              </div>
+              <div class="info-row">
+                <span>成交量:</span>
+                <span>{{ hoverInfo.volume.toFixed(4) }} ETH</span>
+              </div>
+              <div class="info-row">
+                <span>成交额:</span>
+                <span>${{ hoverInfo.turnover.toFixed(2) }}</span>
+              </div>
+              <div class="info-row">
+                <span>VWAP:</span>
+                <span>${{ hoverInfo.vwap.toFixed(2) }}</span>
+              </div>
+              <div class="info-row">
+                <span>涨跌幅:</span>
+                <span :class="hoverInfo.priceChangePct >= 0 ? 'text-green' : 'text-red'">
+                  {{ hoverInfo.priceChangePct >= 0 ? '+' : '' }}{{ hoverInfo.priceChangePct.toFixed(2) }}%
+                </span>
+              </div>
+              <div class="info-row">
+                <span>振幅:</span>
+                <span>{{ hoverInfo.amplitude.toFixed(2) }}%</span>
+              </div>
+            </div>
           </div>
         </div>
-        <div ref="chartContainer" class="chart-content"></div>
       </div>
-      
+
       <div class="info-panel">
-        <h3>市场信息</h3>
+        <h2>市场信息</h2>
         <div class="market-info">
-          <p><strong>交易对：</strong>ETH/USDC</p>
-          <p><strong>当前价格：</strong>$3,456.78</p>
-          <p><strong>24h涨跌：</strong><span class="text-green">+2.34%</span></p>
-          <p><strong>24h成交量：</strong>1,234,567 ETH</p>
+          <p><strong>交易对:</strong> {{ marketInfo.symbol }}</p>
+          <p><strong>当前价格:</strong> ${{ marketInfo.price.toFixed(2) }}</p>
+          <p><strong>24h涨跌:</strong>
+            <span :class="marketInfo.changePercent >= 0 ? 'text-green' : 'text-red'">
+              {{ marketInfo.changePercent >= 0 ? '+' : '' }}{{ marketInfo.changePercent.toFixed(2) }}%
+            </span>
+          </p>
+          <p><strong>24h成交量:</strong> {{ marketInfo.volume24h.toLocaleString() }} ETH</p>
         </div>
       </div>
     </div>
@@ -43,58 +95,112 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted } from 'vue'
+import { ref, onMounted, onUnmounted, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
-import { ElMessage } from 'element-plus'
 import { createChart } from 'lightweight-charts'
+import { ElMessage } from 'element-plus'
+import axios from 'axios'
 
 const router = useRouter()
-const chartContainer = ref()
+const chartContainer = ref(null)
 const selectedTimeframe = ref('1h')
-
 let chart = null
 let candlestickSeries = null
 
-// 模拟K线数据
-const generateMockData = () => {
-  const data = []
-  const basePrice = 3456.78
-  let currentPrice = basePrice
-  const now = new Date()
+const timeframes = [
+  { label: '1分钟', value: '1m' },
+  { label: '5分钟', value: '5m' },
+  { label: '15分钟', value: '15m' },
+  { label: '1小时', value: '1h' },
+  { label: '4小时', value: '4h' },
+  { label: '1天', value: '1d' }
+]
 
-  for (let i = 100; i >= 0; i--) {
-    const time = new Date(now.getTime() - i * 60 * 60 * 1000) // 每小时一根K线
-    const change = (Math.random() - 0.5) * 100 // 随机变化
+const marketInfo = ref({
+  symbol: 'ETH/USDC',
+  price: 3456.78,
+  change: 82.34,
+  changePercent: 2.34,
+  volume24h: 1234567,
+  high24h: 3500.00,
+  low24h: 3400.00
+})
 
-    const open = currentPrice
-    const close = open + change
-    const high = Math.max(open, close) + Math.random() * 50
-    const low = Math.min(open, close) - Math.random() * 50
+// 鼠标悬停信息
+const hoverInfo = ref({
+  visible: false,
+  time: '',
+  open: 0,
+  high: 0,
+  low: 0,
+  close: 0,
+  volume: 0,
+  turnover: 0,
+  vwap: 0,
+  priceChange: 0,
+  priceChangePct: 0,
+  amplitude: 0
+})
 
-    data.push({
-      time: Math.floor(time.getTime() / 1000),
-      open: parseFloat(open.toFixed(2)),
-      high: parseFloat(high.toFixed(2)),
-      low: parseFloat(low.toFixed(2)),
-      close: parseFloat(close.toFixed(2))
+// 获取真实K线数据
+const fetchKlineData = async () => {
+  try {
+    const response = await axios.get('/api/market-data/local-klines/', {
+      params: {
+        timeframe: selectedTimeframe.value,
+        limit: 1000
+      }
     })
 
-    currentPrice = close
-  }
+    if (response.data.success) {
+      const klineData = response.data.data.map(item => ({
+        time: item.time,
+        open: item.open,
+        high: item.high,
+        low: item.low,
+        close: item.close,
+        volume: item.volume,
+        turnover: item.turnover,
+        vwap: item.vwap,
+        priceChange: item.price_change,
+        priceChangePct: item.price_change_pct,
+        amplitude: item.amplitude
+      }))
 
-  return data.sort((a, b) => a.time - b.time)
+      if (candlestickSeries && klineData.length > 0) {
+        candlestickSeries.setData(klineData)
+
+        // 更新市场信息
+        const latest = klineData[klineData.length - 1]
+        marketInfo.value = {
+          symbol: 'ETH/USDC',
+          price: latest.close,
+          change: latest.priceChange,
+          changePercent: latest.priceChangePct,
+          volume24h: klineData.slice(-1440).reduce((sum, item) => sum + item.volume, 0),
+          high24h: Math.max(...klineData.slice(-1440).map(item => item.high)),
+          low24h: Math.min(...klineData.slice(-1440).map(item => item.low))
+        }
+      }
+    }
+  } catch (error) {
+    console.error('获取K线数据失败:', error)
+    ElMessage.error('获取K线数据失败')
+  }
 }
 
-const initChart = () => {
+// 初始化图表
+const initChart = async () => {
+  await nextTick()
+
   if (!chartContainer.value) return
 
-  // 创建图表
   chart = createChart(chartContainer.value, {
     width: chartContainer.value.clientWidth,
     height: 400,
     layout: {
       background: { color: '#ffffff' },
-      textColor: '#333333',
+      textColor: '#333',
     },
     grid: {
       vertLines: { color: '#f0f0f0' },
@@ -103,61 +209,80 @@ const initChart = () => {
     crosshair: {
       mode: 1,
     },
-    rightPriceScale: {
-      borderColor: '#cccccc',
-    },
     timeScale: {
       borderColor: '#cccccc',
       timeVisible: true,
       secondsVisible: false,
     },
+    rightPriceScale: {
+      borderColor: '#cccccc',
+    },
   })
 
-  // 创建K线系列
   candlestickSeries = chart.addCandlestickSeries({
     upColor: '#02c076',
-    downColor: '#f84960',
-    borderDownColor: '#f84960',
+    downColor: '#ff4757',
+    borderDownColor: '#ff4757',
     borderUpColor: '#02c076',
-    wickDownColor: '#f84960',
+    wickDownColor: '#ff4757',
     wickUpColor: '#02c076',
   })
 
-  // 设置数据
-  const data = generateMockData()
-  candlestickSeries.setData(data)
+  // 添加鼠标悬停事件
+  chart.subscribeCrosshairMove((param) => {
+    if (param.point === undefined || !param.time || param.point.x < 0 || param.point.y < 0) {
+      hoverInfo.value.visible = false
+      return
+    }
 
-  // 自适应大小
-  chart.timeScale().fitContent()
+    const data = param.seriesData.get(candlestickSeries)
+    if (data) {
+      const time = new Date(param.time * 1000)
+      hoverInfo.value = {
+        visible: true,
+        time: time.toLocaleString('zh-CN'),
+        open: data.open,
+        high: data.high,
+        low: data.low,
+        close: data.close,
+        volume: data.volume || 0,
+        turnover: data.turnover || 0,
+        vwap: data.vwap || 0,
+        priceChange: data.priceChange || 0,
+        priceChangePct: data.priceChangePct || 0,
+        amplitude: data.amplitude || 0
+      }
+    }
+  })
+
+  // 加载数据
+  await fetchKlineData()
 }
 
-const changeTimeframe = (timeframe) => {
-  ElMessage.info(`切换到 ${timeframe} 时间周期`)
-  // 这里可以重新加载对应时间周期的数据
-  refreshChart()
+// 切换时间周期
+const changeTimeframe = async (timeframe) => {
+  selectedTimeframe.value = timeframe
+  await fetchKlineData()
 }
 
-const refreshChart = () => {
-  if (candlestickSeries) {
-    const newData = generateMockData()
-    candlestickSeries.setData(newData)
-    chart.timeScale().fitContent()
-    ElMessage.success('图表已刷新')
-  }
+// 刷新数据
+const refreshData = async () => {
+  await fetchKlineData()
+  ElMessage.success('数据已刷新')
 }
 
-const handleLogout = () => {
-  ElMessage.success('退出登录成功')
-  router.push('/login')
-}
-
-// 响应式调整图表大小
+// 窗口大小调整
 const handleResize = () => {
   if (chart && chartContainer.value) {
     chart.applyOptions({
       width: chartContainer.value.clientWidth,
     })
   }
+}
+
+const handleLogout = () => {
+  ElMessage.success('退出登录成功')
+  router.push('/login')
 }
 
 onMounted(() => {
@@ -210,24 +335,70 @@ onUnmounted(() => {
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
-.chart-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
+.chart-section {
+  background: white;
+  border-radius: 8px;
+  padding: 20px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
   margin-bottom: 20px;
 }
 
 .chart-controls {
   display: flex;
   gap: 10px;
+  margin-bottom: 20px;
   align-items: center;
 }
 
-.chart-content {
-  width: 100%;
-  height: 400px;
-  border-radius: 4px;
+.chart-container {
+  position: relative;
+  background: #f9f9f9;
+  border-radius: 8px;
   overflow: hidden;
+}
+
+.hover-info {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  background: rgba(255, 255, 255, 0.95);
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  padding: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  font-size: 12px;
+  z-index: 1000;
+  min-width: 200px;
+}
+
+.hover-info-header {
+  margin-bottom: 8px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid #eee;
+  font-size: 13px;
+  color: #333;
+}
+
+.hover-info-content {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.info-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.info-row span:first-child {
+  color: #666;
+  font-weight: 500;
+}
+
+.info-row span:last-child {
+  font-weight: 600;
+  color: #333;
 }
 
 .info-panel {

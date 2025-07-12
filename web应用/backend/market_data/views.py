@@ -10,6 +10,17 @@ from django.views.decorators.cache import cache_page
 from .services import MarketDataService
 from .serializers import KlineChartSerializer, TimeframeSerializer
 from datetime import datetime, timedelta
+import sys
+import os
+
+# 添加trading服务路径
+sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'trading'))
+try:
+    from services.kline_service import KlineService
+    from services.backtest_service import BacktestService
+except ImportError:
+    KlineService = None
+    BacktestService = None
 
 
 class KlineDataView(APIView):
@@ -144,6 +155,159 @@ class SymbolsView(APIView):
                 'timestamp': datetime.now().isoformat()
             })
             
+        except Exception as e:
+            return Response({
+                'success': False,
+                'error': str(e),
+                'timestamp': datetime.now().isoformat()
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class LocalKlineDataView(APIView):
+    """本地K线数据接口（从H5文件读取）"""
+    permission_classes = [AllowAny]
+
+    def __init__(self):
+        super().__init__()
+        if KlineService:
+            self.kline_service = KlineService()
+        else:
+            self.kline_service = None
+
+    def get(self, request):
+        """获取本地K线数据"""
+        try:
+            if not self.kline_service:
+                return Response({
+                    'success': False,
+                    'error': 'K线服务不可用'
+                }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+            # 获取参数
+            start_time = request.GET.get('start_time')
+            end_time = request.GET.get('end_time')
+            timeframe = request.GET.get('timeframe', '1h')
+            limit = int(request.GET.get('limit', 1000))
+
+            # 获取数据
+            data = self.kline_service.get_kline_data(
+                start_time=start_time,
+                end_time=end_time,
+                timeframe=timeframe,
+                limit=limit
+            )
+
+            return Response({
+                'success': True,
+                'data': data,
+                'timestamp': datetime.now().isoformat()
+            })
+
+        except Exception as e:
+            return Response({
+                'success': False,
+                'error': str(e),
+                'timestamp': datetime.now().isoformat()
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class DataRangeView(APIView):
+    """数据范围接口"""
+    permission_classes = [AllowAny]
+
+    def __init__(self):
+        super().__init__()
+        if KlineService:
+            self.kline_service = KlineService()
+        else:
+            self.kline_service = None
+
+    def get(self, request):
+        """获取数据时间范围"""
+        try:
+            if not self.kline_service:
+                return Response({
+                    'success': False,
+                    'error': 'K线服务不可用'
+                }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+            data_range = self.kline_service.get_data_range()
+            return Response({
+                'success': True,
+                'data': data_range,
+                'timestamp': datetime.now().isoformat()
+            })
+        except Exception as e:
+            return Response({
+                'success': False,
+                'error': str(e),
+                'timestamp': datetime.now().isoformat()
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class LatestPriceView(APIView):
+    """最新价格接口"""
+    permission_classes = [AllowAny]
+
+    def __init__(self):
+        super().__init__()
+        if KlineService:
+            self.kline_service = KlineService()
+        else:
+            self.kline_service = None
+
+    def get(self, request):
+        """获取最新价格信息"""
+        try:
+            if not self.kline_service:
+                return Response({
+                    'success': False,
+                    'error': 'K线服务不可用'
+                }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+            price_info = self.kline_service.get_latest_price()
+            return Response({
+                'success': True,
+                'data': price_info,
+                'timestamp': datetime.now().isoformat()
+            })
+        except Exception as e:
+            return Response({
+                'success': False,
+                'error': str(e),
+                'timestamp': datetime.now().isoformat()
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class BacktestView(APIView):
+    """回测接口"""
+    permission_classes = [AllowAny]
+
+    def __init__(self):
+        super().__init__()
+        if BacktestService:
+            self.backtest_service = BacktestService()
+        else:
+            self.backtest_service = None
+
+    def post(self, request):
+        """运行回测"""
+        try:
+            if not self.backtest_service:
+                return Response({
+                    'success': False,
+                    'error': '回测服务不可用'
+                }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+            # 运行回测
+            result = self.backtest_service.run_backtest(request.data)
+
+            return Response({
+                'success': True,
+                'data': result,
+                'timestamp': datetime.now().isoformat()
+            })
+
         except Exception as e:
             return Response({
                 'success': False,

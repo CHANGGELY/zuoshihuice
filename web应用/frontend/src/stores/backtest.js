@@ -31,22 +31,11 @@ export const useBacktestStore = defineStore('backtest', () => {
     try {
       loading.value = true
       error.value = null
-      
+
+      // 调用真实的回测API
       const response = await backtestService.runBacktest(params)
-      const resultId = response.data.result_id
-      
-      // 添加到运行中的回测列表
-      runningBacktests.value.set(resultId, {
-        id: resultId,
-        status: 'running',
-        startTime: new Date(),
-        params
-      })
-      
-      // 开始轮询状态
-      pollBacktestStatus(resultId)
-      
-      return response.data
+
+      return response
     } catch (err) {
       error.value = err.message
       throw err

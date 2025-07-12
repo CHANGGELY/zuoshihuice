@@ -164,6 +164,68 @@
               </div>
             </div>
             
+            <!-- 交易图表 -->
+            <div class="trading-chart-section" v-if="backtestResults.trades && backtestResults.trades.length > 0">
+              <h3>交易位置图表</h3>
+              <div class="chart-container">
+                <BacktestTradingChart
+                  :trades="backtestResults.trades"
+                  :equity-curve="backtestResults.equity_curve"
+                  :symbol="backtestParams.symbol"
+                  :date-range="backtestParams.dateRange"
+                />
+              </div>
+            </div>
+
+            <!-- 交易记录表格 -->
+            <div class="trades-table-section" v-if="backtestResults.trades && backtestResults.trades.length > 0">
+              <h3>交易记录 (最近20笔)</h3>
+              <el-table
+                :data="recentTrades"
+                size="small"
+                max-height="400"
+                style="width: 100%"
+              >
+                <el-table-column prop="timestamp" label="时间" width="180">
+                  <template #default="scope">
+                    {{ formatDateTime(scope.row.timestamp) }}
+                  </template>
+                </el-table-column>
+                <el-table-column prop="type" label="类型" width="100">
+                  <template #default="scope">
+                    <el-tag
+                      :type="getTradeTypeColor(scope.row.type)"
+                      size="small"
+                    >
+                      {{ getTradeTypeName(scope.row.type) }}
+                    </el-tag>
+                  </template>
+                </el-table-column>
+                <el-table-column prop="price" label="价格" width="120">
+                  <template #default="scope">
+                    ${{ formatNumber(scope.row.price, '0.00') }}
+                  </template>
+                </el-table-column>
+                <el-table-column prop="amount" label="数量" width="120">
+                  <template #default="scope">
+                    {{ formatNumber(scope.row.amount, '0.0000') }} ETH
+                  </template>
+                </el-table-column>
+                <el-table-column prop="pnl" label="盈亏" width="120">
+                  <template #default="scope">
+                    <span :class="getPriceChangeClass(scope.row.pnl)">
+                      {{ scope.row.pnl ? formatNumber(scope.row.pnl, '0.00') : '-' }}
+                    </span>
+                  </template>
+                </el-table-column>
+                <el-table-column prop="fee" label="手续费" width="100">
+                  <template #default="scope">
+                    {{ formatNumber(scope.row.fee || 0, '0.00') }}
+                  </template>
+                </el-table-column>
+              </el-table>
+            </div>
+
             <!-- 操作按钮 -->
             <div class="result-actions">
               <el-button
@@ -173,7 +235,7 @@
               >
                 查看详细分析
               </el-button>
-              
+
               <el-button
                 :icon="Download"
                 @click="exportResults"
@@ -195,6 +257,7 @@ import { useMarketStore } from '@/stores/market'
 import { useBacktestStore } from '@/stores/backtest'
 import { formatPercent, formatNumber, getPriceChangeClass } from '@/utils/format'
 import { ElMessage } from 'element-plus'
+import BacktestTradingChart from '@/components/BacktestTradingChart.vue'
 import {
   Play,
   Refresh,
@@ -238,27 +301,27 @@ const runBacktest = async () => {
 
     // 准备回测参数
     const params = {
-      name: `回测_${new Date().toLocaleString()}`,
-      symbol: backtestParams.value.symbol,
+      strategy: 'grid_making',
+      initial_capital: backtestParams.value.initialCapital,
+      leverage: backtestParams.value.leverage,
       start_date: backtestParams.value.dateRange[0],
       end_date: backtestParams.value.dateRange[1],
-      initial_balance: backtestParams.value.initialCapital,
-      leverage: backtestParams.value.leverage,
       bid_spread: backtestParams.value.spreadThreshold,
-      ask_spread: backtestParams.value.spreadThreshold,
-      position_size_ratio: backtestParams.value.orderRatio,
-      max_position_value_ratio: backtestParams.value.positionRatio
+      ask_spread: backtestParams.value.spreadThreshold
     }
 
     // 运行回测
     const result = await backtestStore.runBacktest(params)
 
-    ElMessage.success('回测已启动，请稍后查看结果')
-
-    // 等待回测完成
-    setTimeout(() => {
-      checkBacktestStatus(result.result_id)
-    }, 2000)
+    // 处理回测结果 - 不再使用模拟数据
+    if (result.success && result.data) {
+      backtestResults.value = result.data
+      const tradeCount = result.data.total_trades || 0
+      ElMessage.success(`回测完成！共执行 ${tradeCount} 笔交易`)
+    } else {
+      ElMessage.error(result.error || '回测失败，请检查参数设置')
+      backtestResults.value = null
+    }
 
   } catch (error) {
     ElMessage.error('回测启动失败：' + error.message)
@@ -290,9 +353,121 @@ const resetParams = () => {
   }
 }
 
+// 计算属性：最近的交易记录
+const recentTrades = computed(() => {
+  if (!backtestResults.value?.trades) return []
+  return backtestResults.value.trades.slice(-20).reverse()
+})
+
+// 格式化日期时间
+const formatDateTime = (timestamp) => {
+  if (!timestamp) return '-'
+  const date = new Date(timestamp * 1000)
+  return date.toLocaleString('zh-CN', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit'
+  })
+}
+
+// 获取交易类型颜色
+const getTradeTypeColor = (type) => {
+  const colorMap = {
+    'open_long': 'success',
+    'close_long': 'warning',
+    'open_short': 'danger',
+    'close_short': 'info',
+    'buy_long': 'success',
+    'sell_long': 'warning',
+    'sell_short': 'danger',
+    'buy_short': 'info'
+  }
+  return colorMap[type] || 'info'
+}
+
+// 获取交易类型名称
+const getTradeTypeName = (type) => {
+  const nameMap = {
+    'open_long': '开多',
+    'close_long': '平多',
+    'open_short': '开空',
+    'close_short': '平空',
+    'buy_long': '开多',
+    'sell_long': '平多',
+    'sell_short': '开空',
+    'buy_short': '平空'
+  }
+  return nameMap[type] || type
+}
+
+// 生成模拟回测数据用于演示
+const generateMockBacktestData = (params) => {
+  const startDate = new Date(params.start_date)
+  const endDate = new Date(params.end_date)
+  const days = Math.ceil((endDate - startDate) / (1000 * 60 * 60 * 24))
+
+  // 生成模拟交易记录
+  const trades = []
+  const equityCurve = []
+  let currentPrice = 3000 // ETH起始价格
+  let equity = params.initial_balance
+
+  for (let i = 0; i < days * 10; i++) { // 每天约10笔交易
+    const timestamp = startDate.getTime() / 1000 + i * 8640 // 每2.4小时一笔交易
+
+    // 价格随机波动
+    currentPrice += (Math.random() - 0.5) * 100
+    currentPrice = Math.max(2500, Math.min(3500, currentPrice))
+
+    // 随机生成交易类型
+    const tradeTypes = ['buy_long', 'sell_long', 'sell_short', 'buy_short']
+    const tradeType = tradeTypes[Math.floor(Math.random() * tradeTypes.length)]
+
+    const amount = 0.01 + Math.random() * 0.1 // 0.01-0.11 ETH
+    const fee = amount * currentPrice * 0.0005 // 0.05% 手续费
+    const pnl = (Math.random() - 0.5) * 50 // 随机盈亏
+
+    trades.push({
+      timestamp: timestamp,
+      type: tradeType,
+      price: currentPrice,
+      amount: amount,
+      fee: fee,
+      pnl: pnl
+    })
+
+    // 更新权益
+    equity += pnl - fee
+    equityCurve.push({
+      timestamp: timestamp,
+      equity: equity,
+      price: currentPrice
+    })
+  }
+
+  const finalEquity = equity
+  const totalReturn = (finalEquity - params.initial_balance) / params.initial_balance
+  const maxDrawdown = 0.15 // 模拟最大回撤
+  const profitableTrades = trades.filter(t => t.pnl > 0).length
+
+  return {
+    total_return: totalReturn,
+    max_drawdown: maxDrawdown,
+    sharpe_ratio: 0.8,
+    total_trades: trades.length,
+    win_rate: profitableTrades / trades.length,
+    final_capital: finalEquity,
+    trades: trades,
+    equity_curve: equityCurve
+  }
+}
+
 const exportResults = () => {
   if (!backtestResults.value) return
-  
+
   // 模拟导出功能
   ElMessage.success('结果导出功能开发中...')
 }
@@ -410,5 +585,49 @@ onMounted(async () => {
     gap: 12px;
     justify-content: center;
   }
+}
+
+.trading-chart-section {
+  margin-top: 24px;
+
+  h3 {
+    margin: 0 0 16px 0;
+    color: var(--text-primary);
+    font-size: 18px;
+    font-weight: 600;
+  }
+}
+
+.trades-table-section {
+  margin-top: 24px;
+
+  h3 {
+    margin: 0 0 16px 0;
+    color: var(--text-primary);
+    font-size: 18px;
+    font-weight: 600;
+  }
+
+  .el-table {
+    border-radius: 8px;
+    overflow: hidden;
+
+    :deep(.el-table__header) {
+      background: var(--bg-tertiary);
+    }
+
+    :deep(.el-table__row) {
+      &:hover {
+        background: var(--bg-hover);
+      }
+    }
+  }
+}
+
+.result-actions {
+  margin-top: 24px;
+  display: flex;
+  gap: 12px;
+  justify-content: center;
 }
 </style>

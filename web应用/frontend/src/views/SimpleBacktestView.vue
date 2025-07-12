@@ -14,6 +14,12 @@
       <div class="parameter-panel">
         <h2>策略参数</h2>
         <el-form :model="backtestParams" label-width="120px" size="default">
+          <el-form-item label="策略选择">
+            <el-select v-model="backtestParams.strategy" placeholder="选择策略">
+              <el-option label="网格做市策略" value="grid_making" />
+            </el-select>
+          </el-form-item>
+
           <el-form-item label="交易对">
             <el-select v-model="backtestParams.symbol" placeholder="选择交易对">
               <el-option label="ETH/USDC" value="ETHUSDC" />
@@ -146,12 +152,14 @@
 import { ref, reactive } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
+import axios from 'axios'
 
 const router = useRouter()
 const isRunning = ref(false)
 const backtestResult = ref(null)
 
 const backtestParams = reactive({
+  strategy: 'grid_making',
   symbol: 'ETHUSDC',
   timeframe: '1h',
   initialCapital: 10000,
@@ -163,26 +171,42 @@ const backtestParams = reactive({
 
 const startBacktest = async () => {
   isRunning.value = true
-  
+
   try {
     ElMessage.info('开始回测，请稍候...')
-    
-    // 模拟回测过程
-    await new Promise(resolve => setTimeout(resolve, 3000))
-    
-    // 模拟回测结果
-    backtestResult.value = {
-      totalReturn: Math.random() * 0.4 - 0.1, // -10% 到 30%
-      maxDrawdown: Math.random() * 0.2, // 0% 到 20%
-      sharpeRatio: Math.random() * 2 + 0.5, // 0.5 到 2.5
-      totalTrades: Math.floor(Math.random() * 500) + 100, // 100 到 600
-      winRate: Math.random() * 0.4 + 0.4, // 40% 到 80%
-      finalCapital: backtestParams.initialCapital * (1 + (Math.random() * 0.4 - 0.1))
+
+    // 调用后端回测API
+    const response = await axios.post('/api/market-data/backtest/', {
+      strategy: backtestParams.strategy,
+      symbol: backtestParams.symbol,
+      timeframe: backtestParams.timeframe,
+      initial_capital: backtestParams.initialCapital,
+      leverage: backtestParams.leverage,
+      bid_spread: backtestParams.spreadThreshold,
+      ask_spread: backtestParams.spreadThreshold,
+      start_date: backtestParams.startDate,
+      end_date: backtestParams.endDate
+    })
+
+    if (response.data.success) {
+      const result = response.data.data
+      backtestResult.value = {
+        totalReturn: result.total_return,
+        maxDrawdown: result.max_drawdown,
+        sharpeRatio: result.sharpe_ratio,
+        totalTrades: result.total_trades,
+        winRate: result.win_rate,
+        finalCapital: result.final_capital,
+        trades: result.trades || [],
+        equityCurve: result.equity_curve || []
+      }
+      ElMessage.success('回测完成！')
+    } else {
+      throw new Error(response.data.error || '回测失败')
     }
-    
-    ElMessage.success('回测完成！')
   } catch (error) {
-    ElMessage.error('回测失败：' + error.message)
+    console.error('回测失败:', error)
+    ElMessage.error('回测失败：' + (error.response?.data?.error || error.message))
   } finally {
     isRunning.value = false
   }

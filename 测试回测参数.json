@@ -1,0 +1,7 @@
+{
+  "strategy": "grid_making",
+  "initial_capital": 10000,
+  "leverage": 5,
+  "start_date": "2024-06-15",
+  "end_date": "2024-07-15"
+}
