@@ -1,5 +1,30 @@
 <template>
   <div class="backtest-view">
+    <!-- 顶部导航栏 -->
+    <div class="top-navbar">
+      <div class="navbar-left">
+        <h1 class="app-title">
+          <el-icon><TrendCharts /></el-icon>
+          永续合约做市策略回测平台
+        </h1>
+      </div>
+
+      <div class="navbar-right">
+        <el-button-group>
+          <el-button
+            v-for="route in navRoutes"
+            :key="route.name"
+            :type="$route.name === route.name ? 'primary' : ''"
+            size="small"
+            @click="$router.push({ name: route.name })"
+          >
+            <el-icon><component :is="route.meta.icon" /></el-icon>
+            {{ route.meta.title }}
+          </el-button>
+        </el-button-group>
+      </div>
+    </div>
+
     <div class="page-header">
       <h2>策略回测</h2>
       <p>配置回测参数，运行永续合约做市策略回测</p>
@@ -277,6 +302,7 @@
 <script setup>
 import { ref, computed, onMounted, watch } from 'vue'
 import { storeToRefs } from 'pinia'
+import { useRouter } from 'vue-router'
 import { useMarketStore } from '@/stores/market'
 import { useBacktestStore } from '@/stores/backtest'
 import { formatPercent, formatNumber, getPriceChangeClass } from '@/utils/format'
@@ -287,14 +313,25 @@ import {
   Play,
   Refresh,
   PieChart,
-  Download
+  Download,
+  TrendCharts
 } from '@element-plus/icons-vue'
+
+// Router
+const router = useRouter()
 
 // Store
 const marketStore = useMarketStore()
 const backtestStore = useBacktestStore()
 const { symbols } = storeToRefs(marketStore)
 const { loading: backtestLoading, currentResult: backtestResults, runningBacktests } = storeToRefs(backtestStore)
+
+// 导航路由
+const navRoutes = computed(() => {
+  return router.getRoutes().filter(route =>
+    route.meta?.title && route.name !== 'home' && route.name !== 'login' && route.name !== 'test'
+  )
+})
 
 // 从localStorage恢复回测参数
 const loadBacktestParams = () => {
@@ -552,9 +589,44 @@ onMounted(async () => {
 
 <style lang="scss" scoped>
 .backtest-view {
-  padding: 20px;
   background: var(--bg-primary);
   min-height: 100vh;
+}
+
+.top-navbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0 24px;
+  height: 60px;
+  background: var(--el-bg-color);
+  border-bottom: 1px solid var(--el-border-color);
+
+  .navbar-left {
+    .app-title {
+      margin: 0;
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--el-text-color-primary);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+
+      .el-icon {
+        color: var(--el-color-primary);
+      }
+    }
+  }
+
+  .navbar-right {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+  }
+}
+
+.page-header {
+  padding: 20px 24px 0;
 }
 
 .page-header {
@@ -578,7 +650,8 @@ onMounted(async () => {
   display: grid;
   grid-template-columns: 400px 1fr;
   gap: 24px;
-  
+  padding: 0 24px;
+
   @media (max-width: 1200px) {
     grid-template-columns: 1fr;
   }

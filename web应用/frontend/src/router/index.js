@@ -16,15 +16,15 @@ const router = createRouter({
     {
       path: '/',
       name: 'home',
-      redirect: '/trading',
+      redirect: '/backtest',
       meta: {
-        requiresAuth: true
+        requiresAuth: false
       }
     },
     {
       path: '/trading',
       name: 'trading',
-      component: () => import('@/views/SimpleTradingView.vue'),
+      component: () => import('@/views/TradingView.vue'),
       meta: {
         title: '交易图表',
         icon: 'TrendCharts',
@@ -34,7 +34,7 @@ const router = createRouter({
     {
       path: '/backtest',
       name: 'backtest',
-      component: () => import('@/views/SimpleBacktestView.vue'),
+      component: () => import('@/views/BacktestView.vue'),
       meta: {
         title: '策略回测',
         icon: 'DataAnalysis',
@@ -44,7 +44,7 @@ const router = createRouter({
     {
       path: '/analysis',
       name: 'analysis',
-      component: () => import('@/views/SimpleAnalysisView.vue'),
+      component: () => import('@/views/AnalysisView.vue'),
       meta: {
         title: '结果分析',
         icon: 'PieChart',
@@ -54,7 +54,7 @@ const router = createRouter({
     {
       path: '/settings',
       name: 'settings',
-      component: () => import('@/views/SimpleSettingsView.vue'),
+      component: () => import('@/views/SettingsView.vue'),
       meta: {
         title: '系统设置',
         icon: 'Setting',

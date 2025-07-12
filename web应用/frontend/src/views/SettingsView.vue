@@ -1,5 +1,30 @@
 <template>
   <div class="settings-view">
+    <!-- 顶部导航栏 -->
+    <div class="top-navbar">
+      <div class="navbar-left">
+        <h1 class="app-title">
+          <el-icon><TrendCharts /></el-icon>
+          永续合约做市策略回测平台
+        </h1>
+      </div>
+
+      <div class="navbar-right">
+        <el-button-group>
+          <el-button
+            v-for="route in navRoutes"
+            :key="route.name"
+            :type="$route.name === route.name ? 'primary' : ''"
+            size="small"
+            @click="$router.push({ name: route.name })"
+          >
+            <el-icon><component :is="route.meta.icon" /></el-icon>
+            {{ route.meta.title }}
+          </el-button>
+        </el-button-group>
+      </div>
+    </div>
+
     <div class="page-header">
       <h2>系统设置</h2>
       <p>配置系统参数和个人偏好设置</p>
@@ -157,8 +182,9 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, computed } from 'vue'
 import { storeToRefs } from 'pinia'
+import { useRouter } from 'vue-router'
 import { useSystemStore } from '@/stores/system'
 import { formatTime } from '@/utils/format'
 import { ElMessage } from 'element-plus'
@@ -168,12 +194,23 @@ import {
   Check,
   Refresh,
   Download,
-  Delete
+  Delete,
+  TrendCharts
 } from '@element-plus/icons-vue'
+
+// Router
+const router = useRouter()
 
 // Store
 const systemStore = useSystemStore()
 const { systemInfo, isDark } = storeToRefs(systemStore)
+
+// 导航路由
+const navRoutes = computed(() => {
+  return router.getRoutes().filter(route =>
+    route.meta?.title && route.name !== 'home' && route.name !== 'login' && route.name !== 'test'
+  )
+})
 
 // 设置项
 const language = ref('zh-CN')
@@ -280,9 +317,44 @@ onMounted(() => {
 
 <style lang="scss" scoped>
 .settings-view {
-  padding: 20px;
   background: var(--bg-primary);
   min-height: 100vh;
+}
+
+.top-navbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0 24px;
+  height: 60px;
+  background: var(--el-bg-color);
+  border-bottom: 1px solid var(--el-border-color);
+
+  .navbar-left {
+    .app-title {
+      margin: 0;
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--el-text-color-primary);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+
+      .el-icon {
+        color: var(--el-color-primary);
+      }
+    }
+  }
+
+  .navbar-right {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+  }
+}
+
+.page-header {
+  padding: 20px 24px 0;
 }
 
 .page-header {
@@ -303,6 +375,8 @@ onMounted(() => {
 }
 
 .settings-content {
+  padding: 0 24px;
+
   .el-card {
     background: var(--bg-secondary);
     border: 1px solid var(--border-color);

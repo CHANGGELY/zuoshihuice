@@ -1,5 +1,30 @@
 <template>
   <div class="analysis-view">
+    <!-- 顶部导航栏 -->
+    <div class="top-navbar">
+      <div class="navbar-left">
+        <h1 class="app-title">
+          <el-icon><TrendCharts /></el-icon>
+          永续合约做市策略回测平台
+        </h1>
+      </div>
+
+      <div class="navbar-right">
+        <el-button-group>
+          <el-button
+            v-for="route in navRoutes"
+            :key="route.name"
+            :type="$route.name === route.name ? 'primary' : ''"
+            size="small"
+            @click="$router.push({ name: route.name })"
+          >
+            <el-icon><component :is="route.meta.icon" /></el-icon>
+            {{ route.meta.title }}
+          </el-button>
+        </el-button-group>
+      </div>
+    </div>
+
     <div class="page-header">
       <h2>结果分析</h2>
       <p>深度分析回测结果，查看详细的性能指标和图表</p>
@@ -122,6 +147,7 @@
 <script setup>
 import { ref, computed, onMounted, nextTick, watch } from 'vue'
 import { storeToRefs } from 'pinia'
+import { useRouter } from 'vue-router'
 import { useBacktestStore } from '@/stores/backtest'
 import { formatPercent, formatNumber } from '@/utils/format'
 import * as echarts from 'echarts'
@@ -141,9 +167,19 @@ let equityChart = null
 let tradeDistributionChart = null
 let monthlyReturnsChart = null
 
+// Router
+const router = useRouter()
+
 // Store
 const backtestStore = useBacktestStore()
 const { currentResult } = storeToRefs(backtestStore)
+
+// 导航路由
+const navRoutes = computed(() => {
+  return router.getRoutes().filter(route =>
+    route.meta?.title && route.name !== 'home' && route.name !== 'login' && route.name !== 'test'
+  )
+})
 
 // 计算属性 - 基于真实回测结果
 const hasResults = computed(() => {
@@ -411,9 +447,44 @@ onMounted(() => {
 
 <style lang="scss" scoped>
 .analysis-view {
-  padding: 20px;
   background: var(--bg-primary);
   min-height: 100vh;
+}
+
+.top-navbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0 24px;
+  height: 60px;
+  background: var(--el-bg-color);
+  border-bottom: 1px solid var(--el-border-color);
+
+  .navbar-left {
+    .app-title {
+      margin: 0;
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--el-text-color-primary);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+
+      .el-icon {
+        color: var(--el-color-primary);
+      }
+    }
+  }
+
+  .navbar-right {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+  }
+}
+
+.page-header {
+  padding: 20px 24px 0;
 }
 
 .page-header {
@@ -434,6 +505,8 @@ onMounted(() => {
 }
 
 .analysis-content {
+  padding: 0 24px;
+
   .el-card {
     background: var(--bg-secondary);
     border: 1px solid var(--border-color);
