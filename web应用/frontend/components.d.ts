@@ -7,6 +7,7 @@ export {}
 
 declare module 'vue' {
   export interface GlobalComponents {
+    BacktestKlineChart: typeof import('./src/components/BacktestKlineChart.vue')['default']
     BacktestTradingChart: typeof import('./src/components/BacktestTradingChart.vue')['default']
     ElButton: typeof import('element-plus/es')['ElButton']
     ElCard: typeof import('element-plus/es')['ElCard']

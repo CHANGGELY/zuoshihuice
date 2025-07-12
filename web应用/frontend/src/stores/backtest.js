@@ -3,9 +3,20 @@ import { ref, computed } from 'vue'
 import { backtestService } from '@/services/backtest'
 
 export const useBacktestStore = defineStore('backtest', () => {
+  // 从localStorage恢复状态
+  const loadFromStorage = () => {
+    try {
+      const stored = localStorage.getItem('backtest-current-result')
+      return stored ? JSON.parse(stored) : null
+    } catch (e) {
+      console.warn('Failed to load backtest result from localStorage:', e)
+      return null
+    }
+  }
+
   // 状态
   const backtestResults = ref([])
-  const currentResult = ref(null)
+  const currentResult = ref(loadFromStorage())
   const backtestConfigs = ref([])
   const loading = ref(false)
   const error = ref(null)
@@ -156,6 +167,16 @@ export const useBacktestStore = defineStore('backtest', () => {
   // 设置当前结果
   const setCurrentResult = (result) => {
     currentResult.value = result
+    // 保存到localStorage
+    try {
+      if (result) {
+        localStorage.setItem('backtest-current-result', JSON.stringify(result))
+      } else {
+        localStorage.removeItem('backtest-current-result')
+      }
+    } catch (e) {
+      console.warn('Failed to save backtest result to localStorage:', e)
+    }
   }
   
   // 清除错误

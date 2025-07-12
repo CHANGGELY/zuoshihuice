@@ -105,59 +105,80 @@ def convert_result_format(original_result, config):
     """转换原始回测结果到前端格式"""
     try:
         print(f"📊 原始回测结果键: {list(original_result.keys())}", file=sys.stderr)
-        
+
         # 从原始结果中提取关键指标
-        final_equity = original_result.get('final_equity',
-                      original_result.get('最终总权益',
-                      original_result.get('final_balance', 0)))
-        
-        initial_equity = original_result.get('initial_equity',
-                        original_result.get('初始保证金',
-                        original_result.get('initial_balance',
-                        config.get('initial_capital', 10000))))
-        
-        # 计算总收益率
-        if initial_equity and initial_equity > 0:
-            total_return = (final_equity - initial_equity) / initial_equity
-        else:
-            total_return = 0
-        
+        final_equity = original_result.get('final_equity', 0)
+        initial_capital = config.get('initial_capital', 10000)
+
+        # 使用原始引擎的total_return或自己计算
+        total_return = original_result.get('total_return', 0)
+        if total_return == 0 and final_equity > 0:
+            total_return = (final_equity - initial_capital) / initial_capital
+
         # 提取交易记录
         trades = original_result.get('trades', [])
-        if not trades:
-            trades = original_result.get('交易记录', [])
-        
-        # 转换交易记录格式
+
+        # 转换交易记录格式并计算PnL
         formatted_trades = []
         for trade in trades:
             if isinstance(trade, dict):
-                formatted_trades.append({
-                    'timestamp': trade.get('timestamp', ''),
-                    'side': trade.get('side', ''),
+                # 转换交易类型为前端期望的格式
+                side = trade.get('side', '')
+                action = side  # 保持原始side作为action
+
+                formatted_trade = {
+                    'timestamp': int(trade.get('timestamp', 0)),
+                    'action': action,
+                    'type': action,  # 兼容字段
+                    'side': side,
                     'amount': float(trade.get('amount', 0)),
                     'price': float(trade.get('price', 0)),
                     'fee': float(trade.get('fee', 0)),
                     'pnl': float(trade.get('pnl', 0))
+                }
+                formatted_trades.append(formatted_trade)
+
+        # 提取权益曲线 - 原始引擎使用equity_history
+        equity_history = original_result.get('equity_history', [])
+        equity_curve = []
+        for item in equity_history:
+            if isinstance(item, (list, tuple)) and len(item) >= 2:
+                equity_curve.append({
+                    'timestamp': int(item[0]),
+                    'equity': float(item[1])
                 })
-        
-        # 提取权益曲线
-        equity_curve = original_result.get('equity_curve', [])
-        if not equity_curve:
-            equity_curve = original_result.get('权益曲线', [])
-        
-        # 计算其他指标
-        max_drawdown = original_result.get('max_drawdown',
-                      original_result.get('最大回撤', 0))
-        
-        sharpe_ratio = original_result.get('sharpe_ratio',
-                      original_result.get('夏普比率', 0))
-        
-        # 计算胜率
-        if formatted_trades:
-            winning_trades = sum(1 for trade in formatted_trades if trade.get('pnl', 0) > 0)
-            win_rate = winning_trades / len(formatted_trades) if formatted_trades else 0
-        else:
-            win_rate = 0
+
+        # 计算最大回撤
+        max_drawdown = 0
+        if equity_curve:
+            peak = equity_curve[0]['equity']
+            for point in equity_curve:
+                equity = point['equity']
+                if equity > peak:
+                    peak = equity
+                drawdown = (peak - equity) / peak if peak > 0 else 0
+                max_drawdown = max(max_drawdown, drawdown)
+
+        # 计算夏普比率 (简化版本)
+        sharpe_ratio = 0
+        if equity_curve and len(equity_curve) > 1:
+            returns = []
+            for i in range(1, len(equity_curve)):
+                prev_equity = equity_curve[i-1]['equity']
+                curr_equity = equity_curve[i]['equity']
+                if prev_equity > 0:
+                    daily_return = (curr_equity - prev_equity) / prev_equity
+                    returns.append(daily_return)
+
+            if returns:
+                import numpy as np
+                mean_return = np.mean(returns)
+                std_return = np.std(returns)
+                if std_return > 0:
+                    sharpe_ratio = (mean_return / std_return) * np.sqrt(365)  # 年化
+
+        # 使用原始引擎计算的胜率
+        win_rate = original_result.get('win_rate', 0)
         
         result = {
             'total_return': float(total_return),

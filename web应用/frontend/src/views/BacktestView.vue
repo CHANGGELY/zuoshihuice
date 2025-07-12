@@ -164,8 +164,32 @@
               </div>
             </div>
             
+            <!-- 调试信息 -->
+            <div v-if="backtestResults" style="margin: 20px 0; padding: 10px; background: #f0f8ff; border: 1px solid #ccc; border-radius: 4px;">
+              <h4>🔍 调试信息</h4>
+              <p><strong>回测结果存在:</strong> {{ !!backtestResults }}</p>
+              <p><strong>trades字段存在:</strong> {{ backtestResults && 'trades' in backtestResults }}</p>
+              <p><strong>trades类型:</strong> {{ backtestResults && backtestResults.trades ? typeof backtestResults.trades : 'N/A' }}</p>
+              <p><strong>trades长度:</strong> {{ backtestResults && backtestResults.trades ? backtestResults.trades.length : 'N/A' }}</p>
+              <p><strong>hasValidTrades:</strong> {{ hasValidTrades }}</p>
+              <p><strong>trades前3条:</strong></p>
+              <pre v-if="backtestResults && backtestResults.trades">{{ JSON.stringify(backtestResults.trades.slice(0, 3), null, 2) }}</pre>
+            </div>
+
+            <!-- K线图表 -->
+            <div class="trading-chart-section" v-if="hasValidTrades">
+              <h3>回测K线图表</h3>
+              <div class="chart-container">
+                <BacktestKlineChart
+                  :trades="backtestResults.trades"
+                  :date-range="backtestParams.dateRange"
+                  :symbol="backtestParams.symbol"
+                />
+              </div>
+            </div>
+
             <!-- 交易图表 -->
-            <div class="trading-chart-section" v-if="backtestResults.trades && backtestResults.trades.length > 0">
+            <div class="trading-chart-section" v-if="hasValidTrades">
               <h3>交易位置图表</h3>
               <div class="chart-container">
                 <BacktestTradingChart
@@ -251,13 +275,14 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useMarketStore } from '@/stores/market'
 import { useBacktestStore } from '@/stores/backtest'
 import { formatPercent, formatNumber, getPriceChangeClass } from '@/utils/format'
 import { ElMessage } from 'element-plus'
 import BacktestTradingChart from '@/components/BacktestTradingChart.vue'
+import BacktestKlineChart from '@/components/BacktestKlineChart.vue'
 import {
   Play,
   Refresh,
@@ -271,23 +296,49 @@ const backtestStore = useBacktestStore()
 const { symbols } = storeToRefs(marketStore)
 const { loading: backtestLoading, currentResult: backtestResults, runningBacktests } = storeToRefs(backtestStore)
 
+// 从localStorage恢复回测参数
+const loadBacktestParams = () => {
+  try {
+    const stored = localStorage.getItem('backtest-params')
+    if (stored) {
+      const params = JSON.parse(stored)
+      console.log('从localStorage恢复参数:', params)
+      return { ...params }
+    }
+  } catch (e) {
+    console.warn('Failed to load backtest params from localStorage:', e)
+  }
+  // 默认参数 - 5倍杠杆，一个月时间范围
+  const defaultParams = {
+    symbol: 'ETHUSDT',
+    dateRange: ['2025-05-15', '2025-06-15'], // 使用数据最后一个月
+    initialCapital: 10000,
+    leverage: 5, // 5倍杠杆
+    spreadThreshold: 0.002,
+    positionRatio: 0.8,
+    orderRatio: 0.02
+  }
+  console.log('使用默认参数:', defaultParams)
+  return defaultParams
+}
+
 // 回测参数
-const backtestParams = ref({
-  symbol: 'ETHUSDT',
-  dateRange: ['2024-06-15', '2024-07-14'],
-  initialCapital: 10000,
-  leverage: 125,
-  spreadThreshold: 0.002,
-  positionRatio: 0.8,
-  orderRatio: 0.02
-})
+const backtestParams = ref(loadBacktestParams())
 
 // 计算属性
 const canRunBacktest = computed(() => {
-  return backtestParams.value.symbol && 
-         backtestParams.value.dateRange && 
+  return backtestParams.value.symbol &&
+         backtestParams.value.dateRange &&
          backtestParams.value.dateRange.length === 2 &&
          !backtestLoading.value
+})
+
+// 检查是否有有效的交易数据
+const hasValidTrades = computed(() => {
+  return backtestResults.value &&
+         backtestResults.value.trades &&
+         Array.isArray(backtestResults.value.trades) &&
+         backtestResults.value.trades.length > 0
 })
 
 // 方法
@@ -313,14 +364,15 @@ const runBacktest = async () => {
     // 运行回测
     const result = await backtestStore.runBacktest(params)
 
-    // 处理回测结果 - 不再使用模拟数据
+    // 处理回测结果 - 持久化到store
     if (result.success && result.data) {
-      backtestResults.value = result.data
+      // 设置当前结果到store，实现持久化
+      backtestStore.setCurrentResult(result.data)
       const tradeCount = result.data.total_trades || 0
       ElMessage.success(`回测完成！共执行 ${tradeCount} 笔交易`)
     } else {
       ElMessage.error(result.error || '回测失败，请检查参数设置')
-      backtestResults.value = null
+      backtestStore.setCurrentResult(null)
     }
 
   } catch (error) {
@@ -342,15 +394,17 @@ const checkBacktestStatus = async (resultId) => {
 }
 
 const resetParams = () => {
+  // 使用新的默认参数
   backtestParams.value = {
     symbol: 'ETHUSDT',
-    dateRange: ['2024-06-15', '2024-07-14'],
+    dateRange: ['2025-05-15', '2025-06-15'], // 使用数据最后一个月
     initialCapital: 10000,
-    leverage: 125,
+    leverage: 5, // 5倍杠杆
     spreadThreshold: 0.002,
     positionRatio: 0.8,
     orderRatio: 0.02
   }
+  ElMessage.success('参数已重置')
 }
 
 // 计算属性：最近的交易记录
@@ -472,6 +526,16 @@ const exportResults = () => {
   ElMessage.success('结果导出功能开发中...')
 }
 
+// 监听参数变化，保存到localStorage
+watch(backtestParams, (newParams) => {
+  try {
+    localStorage.setItem('backtest-params', JSON.stringify(newParams))
+    console.log('参数已保存到localStorage:', newParams)
+  } catch (e) {
+    console.warn('Failed to save backtest params to localStorage:', e)
+  }
+}, { deep: true })
+
 // 生命周期
 onMounted(async () => {
   // 确保交易对数据已加载
@@ -481,6 +545,8 @@ onMounted(async () => {
 
   // 加载回测结果
   await backtestStore.fetchBacktestResults()
+
+  console.log('页面加载完成，当前回测参数:', backtestParams.value)
 })
 </script>
 
