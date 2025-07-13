@@ -1,0 +1,57 @@
+version: '3.8'
+
+services:
+  # FastAPI后端服务
+  backend:
+    build: .
+    container_name: backtest-backend
+    ports:
+      - "8000:8000"
+    environment:
+      - ENVIRONMENT=production
+      - DEBUG=false
+      - DATABASE_URL=sqlite:///回测结果.db
+      - CACHE_ENABLED=true
+    volumes:
+      - ./cache:/app/cache
+      - ./K线data:/app/K线data
+      - ./回测结果.db:/app/回测结果.db
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # Nginx反向代理（可选）
+  nginx:
+    image: nginx:alpine
+    container_name: backtest-nginx
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./ssl:/etc/nginx/ssl:ro
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+  # Redis缓存（可选，用于会话存储）
+  redis:
+    image: redis:alpine
+    container_name: backtest-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+
+volumes:
+  redis_data:
+
+networks:
+  default:
+    name: backtest-network

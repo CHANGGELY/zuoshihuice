@@ -7,14 +7,18 @@
 from pydantic_settings import BaseSettings
 from pathlib import Path
 from typing import List
+import os
 
 class Settings(BaseSettings):
     """应用配置"""
-    
+
     # 应用基础配置
     app_name: str = "永续合约回测系统"
     app_version: str = "2.0.0"
     debug: bool = True
+
+    # 环境配置
+    environment: str = "development"  # development, production, testing
     
     # 服务器配置
     host: str = "0.0.0.0"

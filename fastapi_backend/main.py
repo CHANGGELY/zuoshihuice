@@ -25,6 +25,7 @@ try:
     from api.v1.market import router as market_router
     from api.v1.auth import router as auth_router
     from api.v1.websocket import router as websocket_router
+    from api.v1.system import router as system_router
     from core.config import settings
     from core.database import init_db
     from core.cache import cache_manager
@@ -34,6 +35,7 @@ except ImportError:
     from fastapi_backend.api.v1.market import router as market_router
     from fastapi_backend.api.v1.auth import router as auth_router
     from fastapi_backend.api.v1.websocket import router as websocket_router
+    from fastapi_backend.api.v1.system import router as system_router
     from fastapi_backend.core.config import settings
     from fastapi_backend.core.database import init_db
     from fastapi_backend.core.cache import cache_manager
@@ -96,21 +98,43 @@ app = FastAPI(
     lifespan=lifespan
 )
 
-# 添加中间件
+# 导入自定义中间件
+try:
+    from core.middleware import (
+        PerformanceMiddleware,
+        RequestLoggingMiddleware,
+        ErrorHandlingMiddleware,
+        SecurityMiddleware
+    )
+except ImportError:
+    from fastapi_backend.core.middleware import (
+        PerformanceMiddleware,
+        RequestLoggingMiddleware,
+        ErrorHandlingMiddleware,
+        SecurityMiddleware
+    )
+
+# 添加中间件（顺序很重要）
+app.add_middleware(ErrorHandlingMiddleware)  # 最外层：错误处理
+app.add_middleware(PerformanceMiddleware)    # 性能监控
+app.add_middleware(RequestLoggingMiddleware) # 请求日志
+app.add_middleware(SecurityMiddleware)       # 安全头
+app.add_middleware(GZipMiddleware, minimum_size=1000)  # 压缩
+
+# CORS中间件
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],
+    allow_origins=settings.allowed_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-app.add_middleware(GZipMiddleware, minimum_size=1000)
-
 # 注册路由
 app.include_router(backtest_router, prefix="/api/v1/backtest", tags=["回测"])
 app.include_router(market_router, prefix="/api/v1/market", tags=["市场数据"])
 app.include_router(auth_router, prefix="/api/v1/auth", tags=["认证"])
+app.include_router(system_router, prefix="/api/v1/system", tags=["系统监控"])
 app.include_router(websocket_router, prefix="/ws", tags=["WebSocket"])
 
 @app.get("/", summary="根路径")

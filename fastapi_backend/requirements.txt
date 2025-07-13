@@ -30,6 +30,10 @@ passlib[bcrypt]==1.7.4
 # 日志
 loguru==0.7.2
 
+# 系统监控
+psutil==5.9.6
+
 # 开发工具
 pytest==7.4.3
 pytest-asyncio==0.21.1
+httpx==0.25.2
