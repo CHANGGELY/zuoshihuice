@@ -1,10 +1,10 @@
 import axios from 'axios'
 import { ElMessage } from 'element-plus'
 
-// 创建axios实例
+// 创建axios实例 - 适配FastAPI后端
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_BASE_URL || '/api/v1',
-  timeout: 30000,
+  baseURL: import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api/v1',
+  timeout: 300000, // 5分钟超时，适应回测需求
   headers: {
     'Content-Type': 'application/json'
   }
@@ -13,14 +13,17 @@ const api = axios.create({
 // 请求拦截器
 api.interceptors.request.use(
   (config) => {
+    console.log('🚀 API请求:', config.method?.toUpperCase(), config.url, config.data)
+
     // 添加Token认证
-    const token = localStorage.getItem('token')
+    const token = localStorage.getItem('auth_token')
     if (token) {
-      config.headers.Authorization = `Token ${token}`
+      config.headers.Authorization = `Bearer ${token}`
     }
     return config
   },
   (error) => {
+    console.error('❌ 请求错误:', error)
     return Promise.reject(error)
   }
 )
@@ -85,12 +88,31 @@ api.interceptors.response.use(
   }
 )
 
-// API服务
+// API服务 - 适配FastAPI后端
 export const apiService = {
   // 系统相关
-  getSystemInfo: () => api.get('/info/'),
-  getSystemStatus: () => api.get('/status/'),
-  getHealthCheck: () => api.get('/health/'),
+  getHealthCheck: () => api.get('/health'),
+  getSystemInfo: () => api.get('/'),
+
+  // 回测相关
+  runBacktest: (params) => api.post('/backtest/run', params),
+  getBacktestResult: (resultId) => api.get(`/backtest/results/${resultId}`),
+  getBacktestHistory: (limit = 50) => api.get(`/backtest/history?limit=${limit}`),
+  deleteBacktestResult: (resultId) => api.delete(`/backtest/results/${resultId}`),
+  getCacheStatus: () => api.get('/backtest/cache/status'),
+  clearCache: () => api.post('/backtest/cache/clear'),
+
+  // 市场数据相关
+  getKlines: (params) => api.get('/market/klines', { params }),
+  getMarketStats: () => api.get('/market/stats'),
+  getSymbols: () => api.get('/market/symbols'),
+  getTimeframes: () => api.get('/market/timeframes'),
+
+  // 认证相关
+  login: (credentials) => api.post('/auth/login', credentials),
+  logout: () => api.post('/auth/logout'),
+  getProfile: () => api.get('/auth/profile'),
+  getPermissions: () => api.get('/auth/permissions'),
 }
 
 export default api

@@ -1,0 +1,35 @@
+# FastAPI 核心依赖
+fastapi==0.104.1
+uvicorn[standard]==0.24.0
+pydantic==2.5.0
+pydantic-settings==2.1.0
+
+# 数据库
+sqlalchemy==2.0.23
+alembic==1.13.1
+
+# 数据处理
+pandas==2.1.4
+numpy==1.24.4
+tables==3.9.2
+
+# 科学计算
+matplotlib==3.8.2
+scipy==1.11.4
+
+# 异步支持
+asyncio
+aiofiles==23.2.1
+
+# 工具库
+python-multipart==0.0.6
+python-dotenv==1.0.0
+python-jose[cryptography]==3.3.0
+passlib[bcrypt]==1.7.4
+
+# 日志
+loguru==0.7.2
+
+# 开发工具
+pytest==7.4.3
+pytest-asyncio==0.21.1

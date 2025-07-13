@@ -1,70 +1,104 @@
-import api from './api'
+import api, { apiService } from './api'
 
-// 回测服务
+// 回测服务 - 适配FastAPI后端
 export const backtestService = {
   // 运行回测
-  runBacktest: (params) => api.post('/backtest/run/', params),
-
-  // 直接运行回测 - 调用独立回测执行器
-  runDirectBacktest: async (params) => {
+  async runBacktest(params) {
     try {
-      // 模拟调用独立回测执行器
-      // 在实际部署中，这里应该调用后端API来执行独立回测脚本
-
-      // 为了演示，我们使用之前保存的真实回测结果
-      const mockResult = {
-        success: true,
-        data: {
-          total_return: 0.09033165176502098,
-          max_drawdown: 0.1211,
-          sharpe_ratio: 0.05,
-          total_trades: 1014,
-          win_rate: 0.52,
-          final_capital: 10903.32,
-          trades: [
-            {
-              timestamp: "1718431668",
-              side: "buy_long",
-              amount: 0.0565,
-              price: 3535.32,
-              fee: 0.0399,
-              pnl: 0.0
-            },
-            {
-              timestamp: "1718431896",
-              side: "sell_short",
-              amount: 0.0563,
-              price: 3547.74,
-              fee: 0.0399,
-              pnl: 12.45
-            }
-            // ... 更多真实交易记录
-          ],
-          equity_curve: []
-        }
-      }
-
-      // 模拟网络延迟
-      await new Promise(resolve => setTimeout(resolve, 2000))
-
-      return mockResult
+      console.log('🚀 发送回测请求:', params)
+      const response = await apiService.runBacktest(params)
+      console.log('✅ 回测响应:', response)
+      return response
     } catch (error) {
-      throw new Error(`回测执行失败: ${error.message}`)
+      console.error('❌ 回测请求失败:', error)
+      throw error
     }
   },
 
   // 获取回测结果
-  getBacktestResults: () => api.get('/backtest/results/'),
+  async getResults(backtestId) {
+    try {
+      const response = await apiService.getBacktestResult(backtestId)
+      return response
+    } catch (error) {
+      console.error('❌ 获取回测结果失败:', error)
+      throw error
+    }
+  },
 
-  // 获取特定回测结果
-  getBacktestResult: (resultId) => api.get(`/backtest/results/${resultId}/`),
+  // 获取回测历史
+  async getHistory(limit = 50) {
+    try {
+      const response = await apiService.getBacktestHistory(limit)
+      return response
+    } catch (error) {
+      console.error('❌ 获取回测历史失败:', error)
+      throw error
+    }
+  },
 
-  // 获取回测状态
-  getBacktestStatus: (resultId) => api.get(`/backtest/status/${resultId}/`),
+  // 删除回测结果
+  async deleteResult(backtestId) {
+    try {
+      const response = await apiService.deleteBacktestResult(backtestId)
+      return response
+    } catch (error) {
+      console.error('❌ 删除回测结果失败:', error)
+      throw error
+    }
+  },
 
-  // 获取回测配置
-  getBacktestConfigs: () => api.get('/backtest/configs/'),
+  // 获取缓存状态
+  async getCacheStatus() {
+    try {
+      const response = await apiService.getCacheStatus()
+      return response
+    } catch (error) {
+      console.error('❌ 获取缓存状态失败:', error)
+      throw error
+    }
+  },
 
-  // 保存回测配置
-  saveBacktestConfig: (config) => api.post('/backtest/configs/', config),
+  // 清空缓存
+  async clearCache() {
+    try {
+      const response = await apiService.clearCache()
+      return response
+    } catch (error) {
+      console.error('❌ 清空缓存失败:', error)
+      throw error
+    }
+  },
+
+  // WebSocket连接
+  connectWebSocket() {
+    const wsUrl = 'ws://localhost:8000/ws/backtest'
+    const ws = new WebSocket(wsUrl)
+    
+    ws.onopen = () => {
+      console.log('🔌 WebSocket连接已建立')
+      ws.send(JSON.stringify({
+        type: 'subscribe_progress'
+      }))
+    }
+    
+    ws.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data)
+        console.log('📨 WebSocket消息:', data)
+      } catch (error) {
+        console.error('❌ WebSocket消息解析失败:', error)
+      }
+    }
+    
+    ws.onerror = (error) => {
+      console.error('❌ WebSocket错误:', error)
+    }
+    
+    ws.onclose = () => {
+      console.log('🔌 WebSocket连接已关闭')
+    }
+    
+    return ws
+  }
 }
