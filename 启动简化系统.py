@@ -23,7 +23,7 @@ def main():
     
     # 获取项目根目录
     project_root = Path(__file__).parent.absolute()
-    frontend_dir = project_root / "web应用" / "frontend"
+    frontend_dir = project_root / "webapp" / "frontend"
     
     print(f"📁 项目目录: {project_root}")
     print(f"📁 Vue前端: {frontend_dir}")

@@ -24,7 +24,7 @@ def main():
     # 获取项目根目录
     project_root = Path(__file__).parent.absolute()
     fastapi_dir = project_root / "fastapi_backend"
-    frontend_dir = project_root / "web应用" / "frontend"
+    frontend_dir = project_root / "webapp" / "frontend"
     
     print(f"📁 项目目录: {project_root}")
     print(f"📁 FastAPI后端: {fastapi_dir}")

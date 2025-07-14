@@ -2,10 +2,10 @@
 FROM node:18-alpine AS frontend-builder
 
 WORKDIR /app/frontend
-COPY web应用/frontend/package*.json ./
+COPY webapp/frontend/package*.json ./
 RUN npm ci --only=production
 
-COPY web应用/frontend/ ./
+COPY webapp/frontend/ ./
 RUN npm run build
 
 # Python后端阶段

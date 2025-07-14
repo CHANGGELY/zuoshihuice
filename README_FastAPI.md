@@ -46,7 +46,7 @@ cd fastapi_backend
 uvicorn main:app --host 0.0.0.0 --port 8000 --reload
 
 # 启动Vue前端
-cd web应用/frontend
+cd webapp/frontend
 npm run dev
 ```
 
@@ -74,7 +74,7 @@ npm run dev
 │   │   └── cache.py          # 缓存管理
 │   └── services/             # 业务服务
 │       └── backtest_service.py # 异步回测服务
-├── web应用/frontend/         # Vue3前端
+├── webapp/frontend/          # Vue3前端
 │   ├── src/
 │   │   ├── api/              # API调用
 │   │   ├── components/       # 组件
@@ -139,7 +139,7 @@ npm run dev
 pip install fastapi uvicorn sqlalchemy pydantic pydantic-settings
 
 # 前端依赖
-cd web应用/frontend
+cd webapp/frontend
 npm install
 ```
 
@@ -150,7 +150,7 @@ cd fastapi_backend
 uvicorn main:app --reload
 
 # 前端开发模式（热更新）
-cd web应用/frontend
+cd webapp/frontend
 npm run dev
 ```
 
