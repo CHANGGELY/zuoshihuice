@@ -123,7 +123,7 @@
                 @click="runBacktest"
                 :disabled="!canRunBacktest"
               >
-                <el-icon><Play /></el-icon>
+                <el-icon><VideoPlay /></el-icon>
                 {{ backtestLoading ? '回测中...' : '开始回测' }}
               </el-button>
               
@@ -310,7 +310,7 @@ import { ElMessage } from 'element-plus'
 import BacktestTradingChart from '@/components/BacktestTradingChart.vue'
 import BacktestKlineChart from '@/components/BacktestKlineChart.vue'
 import {
-  Play,
+  VideoPlay,
   Refresh,
   PieChart,
   Download,
@@ -387,15 +387,16 @@ const runBacktest = async () => {
       return
     }
 
-    // 准备回测参数
+    // 准备回测参数 - 匹配FastAPI后端格式
     const params = {
-      strategy: 'grid_making',
-      initial_capital: backtestParams.value.initialCapital,
+      symbol: backtestParams.value.symbol,
+      startDate: backtestParams.value.dateRange[0],
+      endDate: backtestParams.value.dateRange[1],
+      initialCapital: backtestParams.value.initialCapital,
       leverage: backtestParams.value.leverage,
-      start_date: backtestParams.value.dateRange[0],
-      end_date: backtestParams.value.dateRange[1],
-      bid_spread: backtestParams.value.spreadThreshold,
-      ask_spread: backtestParams.value.spreadThreshold
+      spreadThreshold: backtestParams.value.spreadThreshold,
+      positionRatio: backtestParams.value.positionRatio,
+      orderRatio: backtestParams.value.orderRatio
     }
 
     // 运行回测

@@ -21,9 +21,9 @@ class RateLimiter:
         
         # 不同端点的限制配置
         self.limits = {
-            "/api/v1/backtest/run": {"requests": 5, "window": 60},  # 回测：1分钟5次
-            "/api/v1/backtest/cache/clear": {"requests": 2, "window": 300},  # 清缓存：5分钟2次
-            "default": {"requests": 100, "window": 60}  # 默认：1分钟100次
+            "/api/v1/backtest/run": {"requests": 10, "window": 60},  # 回测：1分钟10次（更宽松）
+            "/api/v1/backtest/cache/clear": {"requests": 3, "window": 300},  # 清缓存：5分钟3次（稍微宽松）
+            "default": {"requests": 200, "window": 60}  # 默认：1分钟200次（更宽松）
         }
     
     def is_allowed(self, client_ip: str, endpoint: str) -> bool:
@@ -99,16 +99,16 @@ class SecurityValidator:
     def validate_backtest_params(params: dict) -> bool:
         """验证回测参数的安全性"""
         try:
-            # 检查杠杆范围
+            # 检查杠杆范围 (1-125倍)
             leverage = params.get("leverage", 1)
-            if not (1 <= leverage <= 100):
+            if not (1 <= leverage <= 125):
                 logger.warning(f"⚠️ 异常杠杆参数: {leverage}")
                 return False
-            
-            # 检查初始资金范围
+
+            # 检查初始资金范围 (最低100，无上限)
             initial_capital = params.get("initialCapital", 0)
-            if not (100 <= initial_capital <= 10000000):  # 100到1000万
-                logger.warning(f"⚠️ 异常初始资金: {initial_capital}")
+            if initial_capital < 100:
+                logger.warning(f"⚠️ 初始资金过低: {initial_capital}")
                 return False
             
             # 检查价差阈值范围

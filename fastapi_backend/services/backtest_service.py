@@ -9,7 +9,6 @@ import sys
 import json
 import tempfile
 import subprocess
-from concurrent.futures import ProcessPoolExecutor, TimeoutError
 from pathlib import Path
 from typing import Dict, Any, Optional
 import logging
@@ -26,39 +25,33 @@ logger = logging.getLogger(__name__)
 
 class AsyncBacktestService:
     """异步回测服务 - 高性能、稳定、可靠"""
-    
+
     def __init__(self):
-        self.executor = ProcessPoolExecutor(max_workers=settings.max_concurrent_backtests)
         self.project_root = settings.project_root
         self.backtest_engine = settings.backtest_engine
-        
+
         # 添加项目根目录到Python路径
         if str(self.project_root) not in sys.path:
             sys.path.insert(0, str(self.project_root))
     
     async def run_backtest(self, params: Dict[str, Any]) -> Dict[str, Any]:
-        """异步运行回测 - 进程隔离，完美解决崩溃问题"""
+        """异步运行回测 - 直接异步执行，保持原始引擎完整性"""
         logger.info(f"🚀 开始异步回测: {params}")
-        
+
         try:
             # 验证参数
             validated_params = self._validate_params(params)
-            
-            # 在独立进程中运行回测
-            loop = asyncio.get_event_loop()
+
+            # 直接异步执行回测（不使用进程池）
             result = await asyncio.wait_for(
-                loop.run_in_executor(
-                    self.executor,
-                    self._execute_backtest_in_process,
-                    validated_params
-                ),
+                self._execute_backtest_async(validated_params),
                 timeout=settings.backtest_timeout
             )
-            
+
             logger.info("✅ 回测完成")
-            return result
-            
-        except TimeoutError:
+            return self._format_result(result, validated_params)
+
+        except asyncio.TimeoutError:
             logger.error("⏰ 回测超时")
             return {
                 "success": False,
@@ -87,26 +80,35 @@ class AsyncBacktestService:
         }
         
         # 参数范围验证
-        if validated["leverage"] < 1 or validated["leverage"] > 100:
-            raise ValueError("杠杆倍数必须在1-100之间")
-        
+        if validated["leverage"] < 1 or validated["leverage"] > 125:
+            raise ValueError("杠杆倍数必须在1-125之间")
+
         if validated["spreadThreshold"] < 0.0001 or validated["spreadThreshold"] > 0.1:
             raise ValueError("价差阈值必须在0.01%-10%之间")
-        
+
         if validated["initialCapital"] < 100:
             raise ValueError("初始资金不能少于100")
         
         return validated
-    
-    def _execute_backtest_in_process(self, params: Dict[str, Any]) -> Dict[str, Any]:
-        """在独立进程中执行回测 - 完全隔离，避免崩溃"""
+
+    async def _execute_backtest_async(self, params: Dict[str, Any]) -> Dict[str, Any]:
+        """异步执行回测 - 强制使用子进程完全隔离，避免线程锁问题"""
         try:
-            # 方法1: 直接导入执行（推荐）
-            return self._execute_backtest_direct(params)
+            # 🚀 强制使用子进程执行，完全避免线程锁序列化问题
+            result = self._execute_backtest_subprocess(params)
+            return result
         except Exception as e:
-            logger.warning(f"直接执行失败，尝试子进程执行: {e}")
-            # 方法2: 子进程执行（备用）
+            logger.error(f"异步回测执行失败: {e}")
+            return {"error": str(e)}
+
+    def _execute_backtest_in_process(self, params: Dict[str, Any]) -> Dict[str, Any]:
+        """在独立进程中执行回测 - 强制使用子进程，完全避免线程锁问题"""
+        try:
+            # 🚀 强制使用子进程执行，避免线程锁序列化问题
             return self._execute_backtest_subprocess(params)
+        except Exception as e:
+            logger.error(f"子进程执行失败: {e}")
+            raise
     
     def _execute_backtest_direct(self, params: Dict[str, Any]) -> Dict[str, Any]:
         """直接导入原始回测引擎执行"""

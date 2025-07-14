@@ -22,6 +22,7 @@ sys.path.insert(0, str(project_root))
 try:
     # 尝试相对导入（在fastapi_backend目录中运行）
     from api.v1.backtest import router as backtest_router
+    from api.v1.simple_backtest import router as simple_backtest_router
     from api.v1.market import router as market_router
     from api.v1.auth import router as auth_router
     from api.v1.websocket import router as websocket_router
@@ -32,6 +33,7 @@ try:
 except ImportError:
     # 回退到绝对导入（在项目根目录运行）
     from fastapi_backend.api.v1.backtest import router as backtest_router
+    from fastapi_backend.api.v1.simple_backtest import router as simple_backtest_router
     from fastapi_backend.api.v1.market import router as market_router
     from fastapi_backend.api.v1.auth import router as auth_router
     from fastapi_backend.api.v1.websocket import router as websocket_router
@@ -132,6 +134,7 @@ app.add_middleware(
 
 # 注册路由
 app.include_router(backtest_router, prefix="/api/v1/backtest", tags=["回测"])
+app.include_router(simple_backtest_router, prefix="/api/v1/simple-backtest", tags=["简化回测"])
 app.include_router(market_router, prefix="/api/v1/market", tags=["市场数据"])
 app.include_router(auth_router, prefix="/api/v1/auth", tags=["认证"])
 app.include_router(system_router, prefix="/api/v1/system", tags=["系统监控"])

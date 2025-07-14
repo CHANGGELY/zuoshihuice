@@ -1,9 +1,9 @@
 import axios from 'axios'
 import { ElMessage } from 'element-plus'
 
-// 创建axios实例 - 适配FastAPI后端
+// 创建axios实例 - 适配简单回测服务器
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api/v1',
+  baseURL: import.meta.env.VITE_API_BASE_URL || 'http://localhost:8001/api/v1',
   timeout: 300000, // 5分钟超时，适应回测需求
   headers: {
     'Content-Type': 'application/json'
@@ -88,31 +88,33 @@ api.interceptors.response.use(
   }
 )
 
-// API服务 - 适配FastAPI后端
+// API服务 - 适配简单回测服务器
 export const apiService = {
   // 系统相关
   getHealthCheck: () => api.get('/health'),
   getSystemInfo: () => api.get('/'),
 
-  // 回测相关
+  // 回测相关 - 简化版本，只支持核心回测功能
   runBacktest: (params) => api.post('/backtest/run', params),
-  getBacktestResult: (resultId) => api.get(`/backtest/results/${resultId}`),
-  getBacktestHistory: (limit = 50) => api.get(`/backtest/history?limit=${limit}`),
-  deleteBacktestResult: (resultId) => api.delete(`/backtest/results/${resultId}`),
-  getCacheStatus: () => api.get('/backtest/cache/status'),
-  clearCache: () => api.post('/backtest/cache/clear'),
 
-  // 市场数据相关
-  getKlines: (params) => api.get('/market/klines', { params }),
-  getMarketStats: () => api.get('/market/stats'),
-  getSymbols: () => api.get('/market/symbols'),
-  getTimeframes: () => api.get('/market/timeframes'),
+  // 注意：简单回测服务器不支持以下功能，前端需要适配
+  // getBacktestResult: (resultId) => api.get(`/backtest/results/${resultId}`),
+  // getBacktestHistory: (limit = 50) => api.get(`/backtest/history?limit=${limit}`),
+  // deleteBacktestResult: (resultId) => api.delete(`/backtest/results/${resultId}`),
+  // getCacheStatus: () => api.get('/backtest/cache/status'),
+  // clearCache: () => api.post('/backtest/cache/clear'),
 
-  // 认证相关
-  login: (credentials) => api.post('/auth/login', credentials),
-  logout: () => api.post('/auth/logout'),
-  getProfile: () => api.get('/auth/profile'),
-  getPermissions: () => api.get('/auth/permissions'),
+  // 市场数据相关 - 简单回测服务器不支持
+  // getKlines: (params) => api.get('/market/klines', { params }),
+  // getMarketStats: () => api.get('/market/stats'),
+  // getSymbols: () => api.get('/market/symbols'),
+  // getTimeframes: () => api.get('/market/timeframes'),
+
+  // 认证相关 - 简单回测服务器不支持
+  // login: (credentials) => api.post('/auth/login', credentials),
+  // logout: () => api.post('/auth/logout'),
+  // getProfile: () => api.get('/auth/profile'),
+  // getPermissions: () => api.get('/auth/permissions'),
 }
 
 export default api

@@ -7,7 +7,7 @@
 import time
 import logging
 from fastapi import Request, Response
-from fastapi.middleware.base import BaseHTTPMiddleware
+from starlette.middleware.base import BaseHTTPMiddleware
 from typing import Callable
 import json
 

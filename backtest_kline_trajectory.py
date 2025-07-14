@@ -510,7 +510,7 @@ class FastPerpetualStrategy:
             return STRATEGY_CONFIG["min_order_amount"] 
         
         current_equity = self.exchange.get_equity()
-        order_value = current_equity * STRATEGY_CONFIG["position_size_ratio"]
+        order_value = current_equity * Decimal(str(STRATEGY_CONFIG["position_size_ratio"]))
         order_amount = order_value / current_price
         
         min_amount = max(Decimal("0.002"), current_equity / 1000 / current_price)
@@ -557,8 +557,8 @@ class FastPerpetualStrategy:
             return []
 
         # 🚀 性能优化：预计算所有常用值，避免重复计算
-        bid_spread = STRATEGY_CONFIG["bid_spread"]
-        ask_spread = STRATEGY_CONFIG["ask_spread"]
+        bid_spread = Decimal(str(STRATEGY_CONFIG["bid_spread"]))
+        ask_spread = Decimal(str(STRATEGY_CONFIG["ask_spread"]))
         one_minus_bid = Decimal("1") - bid_spread
         one_plus_ask = Decimal("1") + ask_spread
         bid_price = current_price * one_minus_bid
@@ -580,7 +580,7 @@ class FastPerpetualStrategy:
         threshold, max_leverage, _, _ = self.exchange.get_current_leverage_tier()
 
         # 🚀 完全动态计算最大仓位：基于当前权益、杠杆档位和风险控制比例
-        max_position_value_ratio = STRATEGY_CONFIG["max_position_value_ratio"]
+        max_position_value_ratio = Decimal(str(STRATEGY_CONFIG["max_position_value_ratio"]))
 
         # 计算当前档位下的最大仓位价值
         max_position_value_in_tier = min(
@@ -624,13 +624,13 @@ class FastPerpetualStrategy:
         # 6. 创建平多订单
         if long_pos > 0:
             close_long_amount = self.calculate_dynamic_order_size(current_price)
-            close_price = ask_price * (1 + STRATEGY_CONFIG["ask_spread"])
+            close_price = ask_price * (Decimal("1") + ask_spread)
             orders.append(("sell_long", min(close_long_amount, long_pos), close_price))
 
         # 7. 创建平空订单
         if short_pos > 0:
             close_short_amount = self.calculate_dynamic_order_size(current_price)
-            close_price = bid_price * (1 - STRATEGY_CONFIG["bid_spread"])
+            close_price = bid_price * (Decimal("1") - bid_spread)
             orders.append(("buy_short", min(close_short_amount, short_pos), close_price))
 
         self.last_order_time = timestamp
@@ -729,16 +729,20 @@ def analyze_and_plot_performance(
     strategy_params: Optional[Dict] = None,
     win_rate: float = 0.0,
     profitable_trades: int = 0,
-    total_trade_pairs: int = 0
-):
+    total_trade_pairs: int = 0,
+    progress_reporter=None
+) -> Dict:
     if not equity_history:
         print("⚠️ 无法分析性能：历史数据为空。")
-        return
+        return {"max_drawdown": 0.0, "sharpe_ratio": 0.0, "annualized_return": 0.0, "total_return_pct": 0.0}
         
     print("\n" + "="*70)
     print("📈 性能分析与资金曲线")
     print("="*70)
     
+    if progress_reporter:
+        progress_reporter.update(96, 100, "处理权益数据...")
+
     df = pd.DataFrame(equity_history, columns=['timestamp', 'equity'])
 
     # 🚀 修复时间戳溢出问题：过滤异常时间戳
@@ -747,7 +751,10 @@ def analyze_and_plot_performance(
 
     if len(df) == 0:
         print("⚠️ 无法分析性能：所有时间戳都无效。")
-        return
+        return {"max_drawdown": 0.0, "sharpe_ratio": 0.0, "annualized_return": 0.0, "total_return_pct": 0.0}
+
+    if progress_reporter:
+        progress_reporter.update(97, 100, "计算性能指标...")
 
     df['timestamp'] = pd.to_datetime(df['timestamp'], unit='s')
     df['equity'] = df['equity'].astype(float)
@@ -761,8 +768,9 @@ def analyze_and_plot_performance(
     print("-" * 35)
 
     # 1. 计算核心指标
-    end_equity = df['equity'].iloc[-1]
-    total_return_pct = (end_equity - float(initial_balance)) / float(initial_balance)
+    end_equity = float(df['equity'].iloc[-1])  # 确保类型一致
+    initial_balance_float = float(initial_balance)  # 确保类型一致
+    total_return_pct = (end_equity - initial_balance_float) / initial_balance_float
     
     # 2. 计算最大回撤 (Max Drawdown)
     df['peak'] = df['equity'].cummax()
@@ -774,7 +782,7 @@ def analyze_and_plot_performance(
     if num_days < 1:
         num_days = 1
     years = num_days / 365.0
-    annualized_return = (end_equity / float(initial_balance)) ** (1 / years) - 1
+    annualized_return = (end_equity / initial_balance_float) ** (1 / years) - 1
     
     # 4. 计算月均回报率
     monthly_return = (1 + annualized_return)**(1/12) - 1
@@ -791,7 +799,7 @@ def analyze_and_plot_performance(
     # 6. 打印性能指标
     print(f"初始保证金: {initial_balance:,.2f} USDT")
     print(f"最终总权益: {end_equity:,.2f} USDT")
-    print(f"总盈亏: {(end_equity - float(initial_balance)):,.2f} USDT")
+    print(f"总盈亏: {(end_equity - initial_balance_float):,.2f} USDT")
     print(f"总回报率: {total_return_pct:.2%}")
     print("-" * 35)
     print(f"年化回报率: {annualized_return:.2%}")
@@ -862,6 +870,14 @@ def analyze_and_plot_performance(
             print(f"✅ 资金曲线图已成功保存。")
         except Exception as e:
             print(f"❌ 保存资金曲线图失败: {e}")
+
+    # 返回计算出的指标
+    return {
+        "max_drawdown": float(max_drawdown),
+        "sharpe_ratio": float(sharpe_ratio),
+        "annualized_return": float(annualized_return),
+        "total_return_pct": float(total_return_pct)
+    }
 
 # =====================================================================================
 # 数据预处理缓存系统
@@ -978,8 +994,8 @@ def preprocess_kline_data(test_data: pd.DataFrame, use_cache: bool = True) -> tu
             return extract_time_range_from_cache(full_timestamps, full_ohlc_data, start_date, end_date)
 
     # 🚀 策略2：检查当前时间段的缓存
-    start_date_str = test_data['timestamp'].iloc[0].strftime('%Y-%m-%d')
-    end_date_str = test_data['timestamp'].iloc[-1].strftime('%Y-%m-%d')
+    start_date_str = pd.to_datetime(test_data['timestamp'].iloc[0], unit='s').strftime('%Y-%m-%d')
+    end_date_str = pd.to_datetime(test_data['timestamp'].iloc[-1], unit='s').strftime('%Y-%m-%d')
     cache_key = get_data_cache_key(BACKTEST_CONFIG["data_file_path"], start_date_str, end_date_str)
 
     if use_cache:
@@ -1224,7 +1240,7 @@ async def run_fast_perpetual_backtest(use_cache: bool = True):
         if total_trade_pairs_temp > 0:
             win_rate_temp = profitable_trades_temp / total_trade_pairs_temp
 
-    analyze_and_plot_performance(
+    performance_metrics = analyze_and_plot_performance(
         exchange.equity_history,
         Decimal(str(BACKTEST_CONFIG["initial_balance"])),
         exchange.total_fees_paid,
@@ -1320,6 +1336,16 @@ async def run_fast_perpetual_backtest(use_cache: bool = True):
             "leverage": trade.get('leverage', 'N/A')
         })
 
+    # 计算平均持仓时间（基于交易历史）
+    avg_holding_time = 0
+    if len(exchange.trade_history) > 1:
+        # 简化计算：基于交易历史的时间跨度
+        first_trade_time = exchange.trade_history[0].get('timestamp', 0)
+        last_trade_time = exchange.trade_history[-1].get('timestamp', 0)
+        if last_trade_time > first_trade_time and total_trade_pairs > 0:
+            total_hours = (last_trade_time - first_trade_time) / 3600
+            avg_holding_time = total_hours / total_trade_pairs
+
     return {
         "final_equity": float(final_equity),
         "total_return": float(total_return),
@@ -1334,6 +1360,9 @@ async def run_fast_perpetual_backtest(use_cache: bool = True):
         "win_rate": float(win_rate),  # 🚀 添加胜率指标
         "profitable_trades": profitable_trades,  # 盈利交易数
         "total_trade_pairs": total_trade_pairs,  # 总交易对数
+        "max_drawdown": performance_metrics.get("max_drawdown", 0.0),  # 🚀 添加最大回撤
+        "sharpe_ratio": performance_metrics.get("sharpe_ratio", 0.0),  # 🚀 添加夏普比率
+        "avg_holding_time": float(avg_holding_time),  # 🚀 添加平均持仓时间（小时）
         "trades": trades_for_visualization,  # 🚀 添加交易数据供可视化使用
         "equity_history": [(timestamp, float(equity)) for timestamp, equity in exchange.equity_history]  # 权益曲线
     }
@@ -1352,3 +1381,216 @@ if __name__ == "__main__":
         
     warnings.filterwarnings("ignore", message="Glyph", category=UserWarning)
     asyncio.run(run_fast_perpetual_backtest())
+
+# =====================================================================================
+# 简化版性能分析函数（用于进度版回测）
+# =====================================================================================
+
+def calculate_simple_performance_metrics(equity_history, initial_balance, total_fees):
+    """简化版性能分析，避免耗时的pandas操作"""
+    if not equity_history:
+        return {"max_drawdown": 0.0, "sharpe_ratio": 0.0, "annualized_return": 0.0, "total_return_pct": 0.0}
+
+    # 基础计算
+    final_equity = float(equity_history[-1][1])
+    initial_balance_float = float(initial_balance)
+    total_return_pct = (final_equity - initial_balance_float) / initial_balance_float
+
+    # 简化的最大回撤计算
+    peak = initial_balance_float
+    max_drawdown = 0.0
+
+    for _, equity in equity_history:
+        equity_float = float(equity)
+        if equity_float > peak:
+            peak = equity_float
+        drawdown = (peak - equity_float) / peak if peak > 0 else 0.0
+        if drawdown > max_drawdown:
+            max_drawdown = drawdown
+
+    # 简化的年化收益率计算（假设1个月数据）
+    days = 31  # 简化假设
+    years = days / 365.0
+    annualized_return = (final_equity / initial_balance_float) ** (1 / years) - 1 if years > 0 else 0.0
+
+    # 简化的夏普比率（设为0，避免复杂计算）
+    sharpe_ratio = 0.0
+
+    print(f"\n=== 📊 简化版性能分析 ===")
+    print(f"初始保证金: {initial_balance_float:,.2f} USDT")
+    print(f"最终总权益: {final_equity:,.2f} USDT")
+    print(f"总回报率: {total_return_pct:.2%}")
+    print(f"最大回撤: {max_drawdown:.2%}")
+    print(f"年化回报率: {annualized_return:.2%}")
+    print(f"总手续费: {float(total_fees):,.2f} USDT")
+
+    return {
+        "max_drawdown": max_drawdown,
+        "sharpe_ratio": sharpe_ratio,
+        "annualized_return": annualized_return,
+        "total_return_pct": total_return_pct
+    }
+
+# =====================================================================================
+# 支持进度回调的回测函数
+# =====================================================================================
+
+async def run_fast_perpetual_backtest_with_progress(progress_reporter=None):
+    """带进度报告的高性能永续合约回测"""
+    if progress_reporter:
+        progress_reporter.update(40, 100, "加载历史数据...")
+
+    print("=== 🚀 高性能永续合约做市策略回测 (进度版) ===")
+
+    # 1. 快速加载数据
+    df = pd.read_hdf(BACKTEST_CONFIG["data_file_path"], key='klines')
+
+    if progress_reporter:
+        progress_reporter.update(50, 100, "过滤数据...")
+
+    # 2. 过滤数据
+    start_ts = int(pd.to_datetime(BACKTEST_CONFIG["start_date"]).timestamp())
+    end_ts = int(pd.to_datetime(BACKTEST_CONFIG["end_date"]).timestamp())
+
+    # 确保timestamp列是数值类型
+    if df['timestamp'].dtype == 'datetime64[ns]':
+        df['timestamp'] = df['timestamp'].astype('int64') // 10**9
+
+    mask = (df['timestamp'] >= start_ts) & (df['timestamp'] <= end_ts)
+    test_data = df[mask].copy()
+
+    if len(test_data) == 0:
+        raise ValueError(f"指定时间范围内没有数据: {BACKTEST_CONFIG['start_date']} 到 {BACKTEST_CONFIG['end_date']}")
+
+    if progress_reporter:
+        progress_reporter.update(60, 100, "预处理数据...")
+
+    # 3. 预处理数据
+    timestamps, ohlc_data, data_length, start_date_str, end_date_str = preprocess_kline_data(test_data, use_cache=True)
+
+    if progress_reporter:
+        progress_reporter.update(70, 100, "初始化交易引擎...")
+
+    # 4. 初始化组件
+    exchange = FastPerpetualExchange(initial_balance=BACKTEST_CONFIG["initial_balance"])
+    strategy = FastPerpetualStrategy(exchange)
+
+    if progress_reporter:
+        progress_reporter.update(75, 100, "开始回测计算...")
+
+    # 5. 主回测循环
+    prev_close = ohlc_data[0][3]
+    liquidated = False
+    stopped_by_risk = False
+    peak_equity = Decimal(str(BACKTEST_CONFIG["initial_balance"]))
+
+    # 计算进度更新间隔
+    progress_interval = max(1, data_length // 20)  # 每5%更新一次进度
+
+    for i in range(data_length):
+        # 更新进度
+        if progress_reporter and i % progress_interval == 0:
+            progress_pct = 75 + (i / data_length) * 20  # 75% - 95%
+            progress_reporter.update(int(progress_pct), 100, f"处理K线 {i+1}/{data_length}")
+
+        # 回测逻辑（简化版，保持核心功能）
+        kline_timestamp = timestamps[i]
+        o, h, l, c = ohlc_data[i]
+
+        # 获取价格轨迹
+        price_trajectory = get_price_trajectory_vectorized(o, h, l, c, prev_close)
+
+        # 处理每个价格点
+        for j, (price, high_since_open, low_since_open) in enumerate(price_trajectory):
+            sub_timestamp = kline_timestamp + j * 12
+            if sub_timestamp > 2147483647 or sub_timestamp < 0:
+                sub_timestamp = kline_timestamp
+
+            current_price_decimal = Decimal(str(price))
+            exchange.set_current_price(price)
+
+            # 爆仓检查
+            if exchange.check_and_handle_liquidation(sub_timestamp):
+                liquidated = True
+                break
+
+            # 生成订单
+            orders = strategy.generate_orders(current_price_decimal, sub_timestamp)
+            if orders:
+                exchange.place_orders_batch(orders)
+
+            # 订单匹配
+            high_decimal = Decimal(str(high_since_open))
+            low_decimal = Decimal(str(low_since_open))
+            exchange.fast_order_matching(high_decimal, low_decimal, sub_timestamp)
+
+        if liquidated:
+            break
+
+        # 记录权益
+        prev_close = c
+        if kline_timestamp <= 2147483647 and kline_timestamp >= 0:
+            exchange.record_equity(kline_timestamp)
+
+        # 风险监控
+        if RISK_CONFIG["enable_stop_loss"] and not liquidated:
+            equity_now = exchange.get_equity()
+            if equity_now > peak_equity:
+                peak_equity = equity_now
+            drawdown_pct = (peak_equity - equity_now) / peak_equity if peak_equity > 0 else Decimal("0")
+
+            if equity_now <= RISK_CONFIG["min_equity"] or drawdown_pct >= RISK_CONFIG["max_drawdown"]:
+                exchange.close_all_positions_market(kline_timestamp)
+                stopped_by_risk = True
+                break
+
+    if progress_reporter:
+        progress_reporter.update(95, 100, "计算回测指标...")
+
+    # 6. 计算结果 - 禁用图表生成以避免卡住
+    config_no_plot = BACKTEST_CONFIG.copy()
+    config_no_plot["plot_equity_curve"] = False
+
+    if progress_reporter:
+        progress_reporter.update(96, 100, "计算基础指标...")
+
+    # 简化版性能分析 - 避免耗时的pandas操作
+    performance_metrics = calculate_simple_performance_metrics(
+        exchange.equity_history,
+        Decimal(str(BACKTEST_CONFIG["initial_balance"])),
+        exchange.total_fees_paid
+    )
+
+    if progress_reporter:
+        progress_reporter.update(98, 100, "准备返回结果...")
+
+    if progress_reporter:
+        progress_reporter.update(100, 100, "回测完成")
+
+    # 7. 返回结果
+    final_equity = exchange.get_equity()
+    total_return = (final_equity - Decimal(str(BACKTEST_CONFIG["initial_balance"]))) / Decimal(str(BACKTEST_CONFIG["initial_balance"]))
+
+    return {
+        "success": True,
+        "symbol": "ETHUSDT",
+        "start_date": start_date_str,
+        "end_date": end_date_str,
+        "initial_capital": float(BACKTEST_CONFIG["initial_balance"]),
+        "final_equity": float(final_equity),
+        "total_return": float(total_return),
+        "total_trades": len(exchange.trade_history),
+        "win_rate": 0.0,  # 简化版
+        "max_drawdown": performance_metrics.get("max_drawdown", 0.0),
+        "sharpe_ratio": performance_metrics.get("sharpe_ratio", 0.0),
+        "is_liquidated": liquidated,
+        "avg_holding_time": 0.0,  # 简化版
+        "equity_history": [[int(t), float(e)] for t, e in exchange.equity_history],
+        "trades": [
+            {k: (int(v) if hasattr(v, 'dtype') and 'int' in str(v.dtype) else
+                 float(v) if hasattr(v, 'dtype') and 'float' in str(v.dtype) else
+                 float(v) if isinstance(v, Decimal) else v)
+             for k, v in trade.items()}
+            for trade in exchange.trade_history[:100]
+        ]  # 限制交易记录数量并确保JSON可序列化
+    }

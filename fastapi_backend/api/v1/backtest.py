@@ -26,7 +26,7 @@ class BacktestParams(BaseModel):
     startDate: str = Field(..., description="开始日期 YYYY-MM-DD")
     endDate: str = Field(..., description="结束日期 YYYY-MM-DD")
     initialCapital: float = Field(default=10000, ge=100, description="初始资金")
-    leverage: int = Field(default=5, ge=1, le=100, description="杠杆倍数")
+    leverage: int = Field(default=5, ge=1, le=125, description="杠杆倍数")
     spreadThreshold: float = Field(default=0.002, ge=0.0001, le=0.1, description="价差阈值")
     positionRatio: float = Field(default=0.8, ge=0.1, le=1.0, description="仓位比例")
     orderRatio: float = Field(default=0.02, ge=0.001, le=0.1, description="下单比例")

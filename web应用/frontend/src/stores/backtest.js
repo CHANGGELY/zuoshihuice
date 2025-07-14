@@ -43,13 +43,40 @@ export const useBacktestStore = defineStore('backtest', () => {
       loading.value = true
       error.value = null
 
-      // 调用真实的回测API
+      // 调用简单回测服务器API
       const response = await backtestService.runBacktest(params)
 
-      return response
+      // 简单回测服务器直接返回结果，不需要轮询
+      if (response.success && response.result) {
+        // 将结果添加到历史记录
+        const backtestResult = {
+          id: Date.now().toString(),
+          params: params,
+          result: response.result,
+          status: 'completed',
+          created_at: new Date().toISOString(),
+          completed_at: new Date().toISOString()
+        }
+
+        backtestResults.value.unshift(backtestResult)
+        currentResult.value = response.result
+
+        return {
+          success: true,
+          data: response.result
+        }
+      } else {
+        return {
+          success: false,
+          error: response.error || '回测失败'
+        }
+      }
     } catch (err) {
       error.value = err.message
-      throw err
+      return {
+        success: false,
+        error: err.message
+      }
     } finally {
       loading.value = false
     }
