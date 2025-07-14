@@ -1387,7 +1387,7 @@ if __name__ == "__main__":
 # =====================================================================================
 
 def calculate_simple_performance_metrics(equity_history, initial_balance, total_fees):
-    """简化版性能分析，避免耗时的pandas操作"""
+    """超快速性能分析，最小化计算量"""
     if not equity_history:
         return {"max_drawdown": 0.0, "sharpe_ratio": 0.0, "annualized_return": 0.0, "total_return_pct": 0.0}
 
@@ -1396,33 +1396,37 @@ def calculate_simple_performance_metrics(equity_history, initial_balance, total_
     initial_balance_float = float(initial_balance)
     total_return_pct = (final_equity - initial_balance_float) / initial_balance_float
 
-    # 简化的最大回撤计算
+    # 🚀 超快速最大回撤计算 - 只采样关键点
+    sample_size = min(100, len(equity_history))  # 最多采样100个点
+    step = max(1, len(equity_history) // sample_size)
+
     peak = initial_balance_float
     max_drawdown = 0.0
 
-    for _, equity in equity_history:
-        equity_float = float(equity)
+    # 采样计算，大幅减少计算量
+    for i in range(0, len(equity_history), step):
+        equity_float = float(equity_history[i][1])
         if equity_float > peak:
             peak = equity_float
         drawdown = (peak - equity_float) / peak if peak > 0 else 0.0
         if drawdown > max_drawdown:
             max_drawdown = drawdown
 
-    # 简化的年化收益率计算（假设1个月数据）
-    days = 31  # 简化假设
-    years = days / 365.0
-    annualized_return = (final_equity / initial_balance_float) ** (1 / years) - 1 if years > 0 else 0.0
+    # 确保检查最后一个点
+    if len(equity_history) > 1:
+        equity_float = float(equity_history[-1][1])
+        if equity_float > peak:
+            peak = equity_float
+        drawdown = (peak - equity_float) / peak if peak > 0 else 0.0
+        if drawdown > max_drawdown:
+            max_drawdown = drawdown
 
-    # 简化的夏普比率（设为0，避免复杂计算）
-    sharpe_ratio = 0.0
+    # 简化计算，避免复杂数学运算
+    annualized_return = total_return_pct  # 简化为总回报率
+    sharpe_ratio = 0.0  # 设为0，避免复杂计算
 
-    print(f"\n=== 📊 简化版性能分析 ===")
-    print(f"初始保证金: {initial_balance_float:,.2f} USDT")
-    print(f"最终总权益: {final_equity:,.2f} USDT")
-    print(f"总回报率: {total_return_pct:.2%}")
-    print(f"最大回撤: {max_drawdown:.2%}")
-    print(f"年化回报率: {annualized_return:.2%}")
-    print(f"总手续费: {float(total_fees):,.2f} USDT")
+    # 🚀 移除print语句，减少I/O时间
+    # print语句会显著影响性能，特别是在大量数据时
 
     return {
         "max_drawdown": max_drawdown,
@@ -1591,6 +1595,6 @@ async def run_fast_perpetual_backtest_with_progress(progress_reporter=None):
                  float(v) if hasattr(v, 'dtype') and 'float' in str(v.dtype) else
                  float(v) if isinstance(v, Decimal) else v)
              for k, v in trade.items()}
-            for trade in exchange.trade_history[:100]
-        ]  # 限制交易记录数量并确保JSON可序列化
+            for trade in exchange.trade_history
+        ]  # 返回所有交易记录并确保JSON可序列化
     }
