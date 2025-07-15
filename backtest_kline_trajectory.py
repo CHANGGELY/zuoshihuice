@@ -16,8 +16,8 @@ import os
 # =====================================================================================
 BACKTEST_CONFIG = {
     "data_file_path": 'K线data/ETHUSDT_1m_2019-11-01_to_2025-06-15.h5',
-    "start_date": '2025-05-15',  # 🎯 与前端默认值一致
-    "end_date": '2025-06-15',    # 🎯 与前端默认值一致
+    "start_date": None,  # 🎯 与前端默认值一致
+    "end_date": None,    # 🎯 与前端默认值一致
     "initial_balance": 600,      # 🎯 与前端默认值一致
     "plot_equity_curve": True,
     "equity_curve_path": "equity_curve.png",
@@ -41,13 +41,13 @@ STRATEGY_CONFIG = {
 
     # 动态下单量配置
     "use_dynamic_order_size": True,  # 是否使用动态下单量
-    "position_size_ratio": Decimal("0.02"),  # 每次下单占总权益的比例 (降低到2%)
-    "min_order_amount": Decimal("0.008"),   # 最小下单数量 (ETH)
-    "max_order_amount": Decimal("99.0"),    # 最大下单数量 (ETH) - 大幅降低
+    # position_size_ratio: 自动计算参数 = 1/当前有效杠杆，不可手动设置
+    "min_order_amount": Decimal("0.009"),   # 最小下单数量 (ETH) - 必须 >= min_order_size
+    "max_order_amount": Decimal("999.0"),    # 最大下单数量 (ETH) - 大幅降低
 
     # 🚀 币安标准：杠杆选择用总持仓，爆仓检查用净持仓，恢复80%比例
-    "max_position_value_ratio": Decimal("0.8"),  # 最大仓位价值不超过权益的80%
-    "order_refresh_time": 30.0,  # 订单刷新时间(秒)
+    "max_position_value_ratio": Decimal("1"),  # 最大仓位价值不超过权益的100%
+    "order_refresh_time": 15.0,  # 订单刷新时间(秒)
     # 删除资金费率配置，因为数据中没有资金费率
 
     # 新增：单笔止损配置
@@ -87,7 +87,7 @@ REBATE_CONFIG = {
 # =====================================================================================
 RISK_CONFIG = {
     "enable_stop_loss": False,         # 启用止损/退场机制
-    "max_drawdown": Decimal("0.20"), # 最大允许回撤 20% (更严格)
+    "max_drawdown": Decimal("0.30"), # 最大允许回撤 30% (更严格)
     "min_equity": Decimal("300"),    # 当权益低于该值即退场 (USDT) - 提高阈值
     "max_daily_loss": Decimal("0.10"), # 单日最大亏损10%
 }
@@ -189,6 +189,8 @@ class FastPerpetualExchange:
         net_position_value = self.get_net_position_value()  # 使用净持仓价值
 
         for threshold, max_leverage, mm_rate, maintenance_amount in ETH_USDC_TIERS:
+            # max_leverage在此处不使用，但保留用于阶梯保证金表的完整性
+            _ = max_leverage  # 明确标记为未使用但保留
             if net_position_value <= threshold:
                 # 🚀 修正：使用减号，符合币安公式
                 return net_position_value * mm_rate - maintenance_amount
@@ -507,15 +509,22 @@ class FastPerpetualStrategy:
         
     def calculate_dynamic_order_size(self, current_price: Decimal) -> Decimal:
         if not STRATEGY_CONFIG["use_dynamic_order_size"]:
-            return STRATEGY_CONFIG["min_order_amount"] 
-        
+            return STRATEGY_CONFIG["min_order_amount"]
+
         current_equity = self.exchange.get_equity()
-        order_value = current_equity * Decimal(str(STRATEGY_CONFIG["position_size_ratio"]))
+
+        # 🚀 动态计算position_size_ratio = 1 / 当前有效杠杆
+        current_max_leverage = self.exchange.get_current_max_leverage()
+        effective_leverage = min(current_max_leverage, STRATEGY_CONFIG["leverage"])
+        dynamic_position_ratio = Decimal("1") / Decimal(str(effective_leverage))
+
+        order_value = current_equity * dynamic_position_ratio
         order_amount = order_value / current_price
-        
-        min_amount = max(Decimal("0.002"), current_equity / 1000 / current_price)
+
+        # 确保最小下单量符合市场要求
+        min_amount = max(STRATEGY_CONFIG["min_order_amount"], current_equity / 1000 / current_price)
         max_amount = STRATEGY_CONFIG["max_order_amount"]
-        
+
         # 确保下单量在最小和最大值之间
         return max(min_amount, min(max_amount, order_amount))
     
@@ -732,6 +741,8 @@ def analyze_and_plot_performance(
     total_trade_pairs: int = 0,
     progress_reporter=None
 ) -> Dict:
+    # total_funding参数保留用于未来扩展，当前版本暂不使用
+    _ = total_funding  # 明确标记为未使用但保留
     if not equity_history:
         print("⚠️ 无法分析性能：历史数据为空。")
         return {"max_drawdown": 0.0, "sharpe_ratio": 0.0, "annualized_return": 0.0, "total_return_pct": 0.0}
@@ -784,8 +795,9 @@ def analyze_and_plot_performance(
     years = num_days / 365.0
     annualized_return = (end_equity / initial_balance_float) ** (1 / years) - 1
     
-    # 4. 计算月均回报率
+    # 4. 计算月均回报率（保留用于未来扩展）
     monthly_return = (1 + annualized_return)**(1/12) - 1
+    _ = monthly_return  # 明确标记为当前未使用但保留
 
     # 5. 计算夏普比率 (Sharpe Ratio)
     df['daily_return'] = df['equity'].pct_change()
@@ -796,20 +808,24 @@ def analyze_and_plot_performance(
     else:
         sharpe_ratio = 0.0
 
-    # 6. 打印性能指标
+    # 6. 计算新增指标：年化收益率/最大回撤比率
+    if max_drawdown > 0:
+        return_drawdown_ratio = annualized_return / max_drawdown
+    else:
+        return_drawdown_ratio = float('inf') if annualized_return > 0 else 0.0
+
+    # 7. 打印性能指标（简化版，避免重复）
     print(f"初始保证金: {initial_balance:,.2f} USDT")
     print(f"最终总权益: {end_equity:,.2f} USDT")
     print(f"总盈亏: {(end_equity - initial_balance_float):,.2f} USDT")
     print(f"总回报率: {total_return_pct:.2%}")
     print("-" * 35)
     print(f"年化回报率: {annualized_return:.2%}")
-    print(f"月均回报率: {monthly_return:.2%}")
     print(f"最大回撤: {max_drawdown:.2%}")
-    print(f"夏普比率 (年化): {sharpe_ratio:.2f}")
-    print("-" * 35)
+    print(f"年化收益/回撤比: {return_drawdown_ratio:.2f}")
+    print(f"夏普比率: {sharpe_ratio:.2f}")
     print(f"胜率: {win_rate:.1%} ({profitable_trades}/{total_trade_pairs})")
     print(f"总手续费: {total_fees:,.2f} USDT")
-    print(f"总资金费用: {total_funding:,.2f} USDT")
     
     # 6. 绘制资金曲线
     if config["plot_equity_curve"]:
@@ -836,6 +852,8 @@ def analyze_and_plot_performance(
 
         plt.style.use('seaborn-v0_8-darkgrid')
         fig, ax = plt.subplots(figsize=(15, 8))
+        # fig变量保留用于可能的图表保存功能
+        _ = fig  # 明确标记为当前未使用但保留
         
         ax.plot(df.index, df['equity'], label='Equity Curve', color='dodgerblue', linewidth=2)
         ax.fill_between(df.index, df['peak'], df['equity'], facecolor='red', alpha=0.3, label='Drawdown')
@@ -844,13 +862,12 @@ def analyze_and_plot_performance(
         if strategy_params:
             leverage = strategy_params.get('leverage', 'N/A')
             bid_spread = strategy_params.get('bid_spread', 'N/A')
-            position_ratio = strategy_params.get('position_size_ratio', 'N/A')
         else:
             leverage = STRATEGY_CONFIG['leverage']
             bid_spread = STRATEGY_CONFIG['bid_spread']
-            position_ratio = STRATEGY_CONFIG['position_size_ratio']
 
-        title = f'Equity Curve | Leverage: {leverage}x | Spread: ±{float(bid_spread)*100:.1f}% | Position: {float(position_ratio)*100:.1f}%'
+        # position_ratio现在是动态计算的，显示为Auto
+        title = f'Equity Curve | Leverage: {leverage}x | Spread: ±{float(bid_spread)*100:.1f}% | Position: Auto (1/Leverage)'
         subtitle = f'Total Return: {total_return_pct:.1%} | Annualized: {annualized_return:.1%} | Max Drawdown: {max_drawdown:.1%}'
 
         ax.set_title(title, fontsize=16, weight='bold', pad=20)
@@ -876,7 +893,8 @@ def analyze_and_plot_performance(
         "max_drawdown": float(max_drawdown),
         "sharpe_ratio": float(sharpe_ratio),
         "annualized_return": float(annualized_return),
-        "total_return_pct": float(total_return_pct)
+        "total_return_pct": float(total_return_pct),
+        "return_drawdown_ratio": float(return_drawdown_ratio)
     }
 
 # =====================================================================================
@@ -938,7 +956,8 @@ def run_backtest_with_params(strategy_params: Optional[Dict] = None, market_para
 
         # 运行回测
         import asyncio
-        return asyncio.run(run_fast_perpetual_backtest(use_cache=use_cache))
+        result = asyncio.run(run_fast_perpetual_backtest(use_cache=use_cache))
+        return result if result is not None else {}
 
     finally:
         # 恢复原始配置
@@ -1039,12 +1058,7 @@ def preprocess_kline_data(test_data: pd.DataFrame, use_cache: bool = True) -> tu
 # 高性能主回测函数 (已更新)
 # =====================================================================================
 async def run_fast_perpetual_backtest(use_cache: bool = True):
-    print("=== 🚀 高性能永续合约做市策略回测 (精度增强版) ===")
-    print("更新说明:")
-    print("  ✓ 恢复5点K线价格轨迹模拟，提升精度")
-    print("  ✓ 恢复完整的交易历史记录")
-    print("  ✓ 新增资金权益曲线图绘制")
-    print()
+    print("🚀 开始永续合约做市策略回测...")
     
     print("策略特点:")
     print(f"  初始杠杆: {STRATEGY_CONFIG['leverage']}x (动态调整)")
@@ -1052,7 +1066,7 @@ async def run_fast_perpetual_backtest(use_cache: bool = True):
     print(f"  最大仓位价值比例: {STRATEGY_CONFIG['max_position_value_ratio']*100:.0f}% (完全动态计算)")
     
     if STRATEGY_CONFIG["use_dynamic_order_size"]:
-        print(f"  动态下单: 每次下单占总权益的 {STRATEGY_CONFIG['position_size_ratio']*100:.1f}%")
+        print(f"  动态下单: 每次下单占总权益的比例 = 1/当前杠杆 (自动调整)")
         print(f"  下单范围: {STRATEGY_CONFIG['min_order_amount']:.3f} - {STRATEGY_CONFIG['max_order_amount']:.1f} ETH")
     print()
     
@@ -1076,6 +1090,10 @@ async def run_fast_perpetual_backtest(use_cache: bool = True):
     print(f"✓ 加载了 {len(test_data)} 条K线数据")
 
     # 1.5. 预处理数据（带缓存）
+    # 确保test_data是DataFrame类型
+    if not isinstance(test_data, pd.DataFrame):
+        print("❌ 错误: 数据类型不正确!")
+        return
     timestamps, ohlc_data, data_length, start_date_str, end_date_str = preprocess_kline_data(test_data, use_cache)
     print(f"✓ 数据预处理完成，回测时间范围: {start_date_str} -> {end_date_str}")
     
@@ -1083,12 +1101,7 @@ async def run_fast_perpetual_backtest(use_cache: bool = True):
     exchange = FastPerpetualExchange(initial_balance=BACKTEST_CONFIG["initial_balance"])
     strategy = FastPerpetualStrategy(exchange)
     
-    print(f"初始化完成:")
-    print(f"  初始保证金: {BACKTEST_CONFIG['initial_balance']} USDT")
-    print()
-    
-    # 3. 高速回测主循环
-    print("🚀 开始高性能永续合约做市回测...")
+    print(f"✓ 初始化完成，初始保证金: {BACKTEST_CONFIG['initial_balance']} USDT")
     prev_close = ohlc_data[0][3]  # 使用第一行的收盘价
 
     liquidated = False
@@ -1175,12 +1188,10 @@ async def run_fast_perpetual_backtest(use_cache: bool = True):
     
     # 4. 输出最终结果
     print("\n" + "="*70)
-    print("🚀 高性能永续合约做市策略回测结果")
+    print("� 回测结果")
     print("="*70)
     print(f"总交易次数: {len(exchange.trade_history)}")
-    print(f"多头仓位: {exchange.long_position:.4f} ETH (均价: {exchange.long_entry_price:.2f})")
-    print(f"空头仓位: {exchange.short_position:.4f} ETH (均价: {exchange.short_entry_price:.2f})")
-    print(f"净仓位: {exchange.get_net_position():.4f} ETH")
+    print(f"最终仓位 - 多头: {exchange.long_position:.4f} ETH, 空头: {exchange.short_position:.4f} ETH")
     print(f"当前保证金率: {exchange.get_margin_ratio():.4f}")
     
     if len(exchange.trade_history) > 0:
@@ -1367,20 +1378,9 @@ async def run_fast_perpetual_backtest(use_cache: bool = True):
         "equity_history": [(timestamp, float(equity)) for timestamp, equity in exchange.equity_history]  # 权益曲线
     }
 
-if __name__ == "__main__":
-    logging.basicConfig(level=logging.WARNING)
-    # 检查matplotlib是否安装
-    try:
-        import matplotlib
-    except ImportError:
-        print("="*60)
-        print("错误: 缺少 'matplotlib' 库。")
-        print("请运行 'pip install matplotlib' 来安装。")
-        print("="*60)
-        exit()
-        
-    warnings.filterwarnings("ignore", message="Glyph", category=UserWarning)
-    asyncio.run(run_fast_perpetual_backtest())
+# =====================================================================================
+# 主函数入口移至文件末尾
+# =====================================================================================
 
 # =====================================================================================
 # 简化版性能分析函数（用于进度版回测）
@@ -1388,6 +1388,9 @@ if __name__ == "__main__":
 
 def calculate_simple_performance_metrics(equity_history, initial_balance, total_fees):
     """超快速性能分析，最小化计算量"""
+    # total_fees参数保留用于未来扩展，当前版本暂不使用
+    _ = total_fees  # 明确标记为未使用但保留
+
     if not equity_history:
         return {"max_drawdown": 0.0, "sharpe_ratio": 0.0, "annualized_return": 0.0, "total_return_pct": 0.0}
 
@@ -1445,9 +1448,7 @@ async def run_fast_perpetual_backtest_with_progress(progress_reporter=None):
     if progress_reporter:
         progress_reporter.update(10, 100, "初始化回测环境...")
 
-    print("=== 🚀 高性能永续合约做市策略回测 (进度版) ===")
-    print("🎯 架构优化：直接调用主回测函数，确保前后端结果完全一致")
-    print("=" * 80)
+    print("🚀 开始进度版回测...")
 
     try:
         if progress_reporter:
@@ -1460,6 +1461,10 @@ async def run_fast_perpetual_backtest_with_progress(progress_reporter=None):
             progress_reporter.update(90, 100, "处理回测结果...")
 
         # 转换结果格式以适配前端需求，确保所有数值都是JSON可序列化的
+        # 确保result不为None
+        if result is None:
+            result = {}
+
         frontend_result = {
             "success": True,
             "symbol": "ETHUSDT",
@@ -1490,12 +1495,45 @@ async def run_fast_perpetual_backtest_with_progress(progress_reporter=None):
         if progress_reporter:
             progress_reporter.update(100, 100, "回测完成!")
 
-        print("✅ 进度版回测完成，结果与主函数完全一致")
+        print("✅ 进度版回测完成")
         return frontend_result
 
     except Exception as e:
         if progress_reporter:
             progress_reporter.update(100, 100, f"回测失败: {str(e)}")
 
-        print(f"❌ 进度版回测失败: {e}")
+        print(f"❌ 回测失败: {e}")
         raise
+
+# =====================================================================================
+# 主函数入口
+# =====================================================================================
+
+if __name__ == "__main__":
+    import asyncio
+    import logging
+    import warnings
+
+    # 配置日志级别
+    logging.basicConfig(level=logging.WARNING)
+
+    # 检查matplotlib是否安装
+    try:
+        import matplotlib
+        # 设置matplotlib后端，避免GUI依赖
+        matplotlib.use('Agg')
+    except ImportError:
+        print("="*60)
+        print("错误: 缺少 'matplotlib' 库。")
+        print("请运行 'pip install matplotlib' 来安装。")
+        print("="*60)
+        exit()
+
+if __name__ == "__main__":
+    # 忽略字体警告
+    warnings.filterwarnings("ignore", message="Glyph", category=UserWarning)
+
+    # 运行主回测函数
+    result = asyncio.run(run_fast_perpetual_backtest())
+
+    print("\n🎉 回测执行完成！")

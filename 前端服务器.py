@@ -478,10 +478,7 @@ class FrontendHandler(BaseHTTPRequestHandler):
                         <label>卖单价差</label>
                         <input type="number" id="askSpread" value="0.002" step="0.0001" title="卖单价差比例">
                     </div>
-                    <div class="form-group">
-                        <label>仓位比例</label>
-                        <input type="number" id="positionSizeRatio" value="0.02" step="0.001" title="每次下单占总权益的比例">
-                    </div>
+                    <!-- 仓位比例已改为自动计算 (1/当前杠杆)，不再需要手动设置 -->
                     <div class="form-group">
                         <label>最大仓位比例</label>
                         <input type="number" id="maxPositionRatio" value="0.8" step="0.01" title="最大仓位价值不超过权益的比例">
@@ -1108,7 +1105,7 @@ class FrontendHandler(BaseHTTPRequestHandler):
                     // 🎯 新增参数，与backtest_kline_trajectory.py一致
                     bidSpread: parseFloat(document.getElementById('bidSpread').value),
                     askSpread: parseFloat(document.getElementById('askSpread').value),
-                    positionSizeRatio: parseFloat(document.getElementById('positionSizeRatio').value),
+                    // positionSizeRatio: 自动计算 = 1/当前杠杆，不再从前端传递
                     maxPositionRatio: parseFloat(document.getElementById('maxPositionRatio').value),
                     orderRefreshTime: parseFloat(document.getElementById('orderRefreshTime').value),
                     useDynamicOrderSize: document.getElementById('useDynamicOrderSize').checked,
