@@ -270,10 +270,37 @@ class FrontendHandler(BaseHTTPRequestHandler):
             justify-content: space-between;
             align-items: center;
         }
-        
+
         .chart-header h3 {
             color: #333;
             margin: 0;
+        }
+
+        /* 🎯 时间周期选择器样式 */
+        .timeframe-selector {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .timeframe-selector select {
+            background: #2b2b2b;
+            color: #f0b90b;
+            border: 1px solid #f0b90b;
+            border-radius: 4px;
+            padding: 5px 10px;
+            font-size: 12px;
+            font-weight: bold;
+            cursor: pointer;
+            outline: none;
+        }
+
+        .timeframe-selector select:hover {
+            background: #3b3b3b;
+        }
+
+        .timeframe-selector select:focus {
+            box-shadow: 0 0 5px rgba(240, 185, 11, 0.5);
         }
         
         .chart-info {
@@ -437,26 +464,51 @@ class FrontendHandler(BaseHTTPRequestHandler):
                     </div>
                     <div class="form-group">
                         <label>初始资金 (USDT)</label>
-                        <input type="number" id="initialCapital" value="607.88" step="0.01">
+                        <input type="number" id="initialCapital" value="600" step="0.01">
                     </div>
                     <div class="form-group">
                         <label>杠杆倍数</label>
-                        <input type="number" id="leverage" value="5" min="1" max="125">
+                        <input type="number" id="leverage" value="125" min="1" max="125">
                     </div>
                     <div class="form-group">
-                        <label>价差阈值</label>
-                        <input type="number" id="spreadThreshold" value="0.0005" step="0.0001">
+                        <label>买单价差</label>
+                        <input type="number" id="bidSpread" value="0.002" step="0.0001" title="买单价差比例">
                     </div>
-
-                    <!-- 🎯 时间周期选择器 -->
                     <div class="form-group">
-                        <label>时间周期</label>
-                        <select id="timeframe">
-                            <option value="1m" selected>1分钟</option>
-                            <option value="1h">1小时</option>
-                            <option value="1d">1天</option>
-                            <option value="1M">1月</option>
-                        </select>
+                        <label>卖单价差</label>
+                        <input type="number" id="askSpread" value="0.002" step="0.0001" title="卖单价差比例">
+                    </div>
+                    <div class="form-group">
+                        <label>仓位比例</label>
+                        <input type="number" id="positionSizeRatio" value="0.02" step="0.001" title="每次下单占总权益的比例">
+                    </div>
+                    <div class="form-group">
+                        <label>最大仓位比例</label>
+                        <input type="number" id="maxPositionRatio" value="0.8" step="0.01" title="最大仓位价值不超过权益的比例">
+                    </div>
+                    <div class="form-group">
+                        <label>订单刷新时间(秒)</label>
+                        <input type="number" id="orderRefreshTime" value="30" step="1" title="订单刷新间隔">
+                    </div>
+                    <div class="form-group">
+                        <label>启用动态下单量</label>
+                        <input type="checkbox" id="useDynamicOrderSize" checked title="是否使用动态下单量">
+                    </div>
+                    <div class="form-group">
+                        <label>Maker手续费率</label>
+                        <input type="number" id="makerFee" value="0.0002" step="0.0001" title="Maker订单手续费率">
+                    </div>
+                    <div class="form-group">
+                        <label>Taker手续费率</label>
+                        <input type="number" id="takerFee" value="0.0005" step="0.0001" title="Taker订单手续费率">
+                    </div>
+                    <div class="form-group">
+                        <label>启用返佣</label>
+                        <input type="checkbox" id="useFeeRebate" checked title="是否启用手续费返佣">
+                    </div>
+                    <div class="form-group">
+                        <label>返佣比例</label>
+                        <input type="number" id="rebateRate" value="0.30" step="0.01" min="0" max="1" title="手续费返佣比例 (0-1)">
                     </div>
                 </div>
 
@@ -510,6 +562,15 @@ class FrontendHandler(BaseHTTPRequestHandler):
                 <div class="chart-container kline-container">
                     <div class="chart-header">
                         <h3>📈 K线图表</h3>
+                        <!-- 🎯 时间周期选择器 - 移到图表内部 -->
+                        <div class="timeframe-selector">
+                            <select id="timeframe">
+                                <option value="1m" selected>1分钟</option>
+                                <option value="1h">1小时</option>
+                                <option value="1d">1天</option>
+                                <option value="1M">1月</option>
+                            </select>
+                        </div>
                         <div class="chart-info" id="klineInfo">
                             数据范围: 2019-11-01 至 2025-06-15 | 请选择时间范围加载数据
                         </div>
@@ -568,6 +629,20 @@ class FrontendHandler(BaseHTTPRequestHandler):
             ['showBuyLong', 'showSellShort', 'showSellLong', 'showBuyShort'].forEach(id => {
                 document.getElementById(id).addEventListener('change', updateTradeMarkers);
             });
+
+            // 🎯 添加时间周期选择器事件监听器
+            document.getElementById('timeframe').addEventListener('change', function() {
+                const timeframe = this.value;
+                console.log(`时间周期切换到: ${timeframe}`);
+
+                // 如果已经加载了K线数据，重新加载
+                const startDate = document.getElementById('startDate').value;
+                const endDate = document.getElementById('endDate').value;
+
+                if (startDate && endDate) {
+                    loadKlineData(startDate, endDate, timeframe);
+                }
+            });
         });
         
         // 检查服务器状态
@@ -588,12 +663,12 @@ class FrontendHandler(BaseHTTPRequestHandler):
         }
 
         // 加载K线数据
-        async function loadKlineData() {
+        async function loadKlineData(customStartDate = null, customEndDate = null, customTimeframe = null) {
             try {
                 const symbol = document.getElementById('symbol').value;
-                const startDate = document.getElementById('startDate').value;
-                const endDate = document.getElementById('endDate').value;
-                const timeframe = document.getElementById('timeframe').value;
+                const startDate = customStartDate || document.getElementById('startDate').value;
+                const endDate = customEndDate || document.getElementById('endDate').value;
+                const timeframe = customTimeframe || document.getElementById('timeframe').value;
 
                 if (!startDate || !endDate) {
                     alert('请选择开始和结束日期');
@@ -621,8 +696,9 @@ class FrontendHandler(BaseHTTPRequestHandler):
                 displayKlineChart(data);
 
                 // 更新图表信息
+                const sourceText = data.source === 'cache' ? '⚡缓存' : '🔄实时';
                 document.getElementById('klineInfo').textContent =
-                    `${symbol} | ${startDate} 至 ${endDate} | 共 ${data.klines.length} 条K线数据`;
+                    `${symbol} | ${startDate} 至 ${endDate} | ${timeframeText} | 共 ${data.klines.length} 条K线数据 | ${sourceText}`;
 
             } catch (error) {
                 console.error('加载K线数据失败:', error);
@@ -1021,16 +1097,34 @@ class FrontendHandler(BaseHTTPRequestHandler):
                 status.classList.add('hidden');
                 updateProgress(0, "准备回测参数...");
 
-                // 收集参数
+                // 收集参数 - 与backtest_kline_trajectory.py保持一致
                 const params = {
                     symbol: document.getElementById('symbol').value,
                     startDate: document.getElementById('startDate').value,
                     endDate: document.getElementById('endDate').value,
                     initialCapital: parseFloat(document.getElementById('initialCapital').value),
                     leverage: parseInt(document.getElementById('leverage').value),
-                    spreadThreshold: parseFloat(document.getElementById('spreadThreshold').value),
-                    positionRatio: 0.8,
-                    orderRatio: 0.1
+
+                    // 🎯 新增参数，与backtest_kline_trajectory.py一致
+                    bidSpread: parseFloat(document.getElementById('bidSpread').value),
+                    askSpread: parseFloat(document.getElementById('askSpread').value),
+                    positionSizeRatio: parseFloat(document.getElementById('positionSizeRatio').value),
+                    maxPositionRatio: parseFloat(document.getElementById('maxPositionRatio').value),
+                    orderRefreshTime: parseFloat(document.getElementById('orderRefreshTime').value),
+                    useDynamicOrderSize: document.getElementById('useDynamicOrderSize').checked,
+
+                    // 🎯 手续费和返佣参数（前端可调）
+                    makerFee: parseFloat(document.getElementById('makerFee').value),
+                    takerFee: parseFloat(document.getElementById('takerFee').value),
+                    useFeeRebate: document.getElementById('useFeeRebate').checked,
+                    rebateRate: parseFloat(document.getElementById('rebateRate').value),
+
+                    // 固定参数（与backtest_kline_trajectory.py保持一致）
+                    positionMode: "Hedge",
+                    minOrderAmount: 0.008,
+                    maxOrderAmount: 99.0,
+                    positionStopLoss: 0.05,
+                    enablePositionStopLoss: false
                 };
 
                 // 开始进度监控

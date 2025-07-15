@@ -17,6 +17,7 @@ from urllib.parse import urlparse, parse_qs
 import pandas as pd
 import numpy as np
 import logging
+import pickle
 
 # 配置日志
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -27,6 +28,16 @@ class UnifiedBacktestHandler(BaseHTTPRequestHandler):
     
     def __init__(self, *args, **kwargs):
         self.data_file = Path("K线data") / "ETHUSDT_1m_2019-11-01_to_2025-06-15.h5"
+        self.cache_dir = Path("K线data")  # 🎯 改为K线data文件夹
+
+        # 🎯 时间周期缓存文件映射
+        self.timeframe_cache = {
+            '1m': 'ETHUSDT_1m_processed.pkl',
+            '1h': 'ETHUSDT_1h_processed.pkl',
+            '1d': 'ETHUSDT_1d_processed.pkl',
+            '1M': 'ETHUSDT_1M_processed.pkl'
+        }
+
         super().__init__(*args, **kwargs)
     
     def do_OPTIONS(self):
@@ -96,7 +107,26 @@ class UnifiedBacktestHandler(BaseHTTPRequestHandler):
             "timestamp": datetime.now().isoformat()
         }
         self.send_json_response(response)
-    
+
+    def load_cached_klines(self, timeframe):
+        """🚀 加载预处理的缓存数据"""
+        try:
+            cache_file = self.cache_dir / self.timeframe_cache[timeframe]
+
+            if not cache_file.exists():
+                logger.warning(f"⚠️ 缓存文件不存在: {cache_file}")
+                return None
+
+            with open(cache_file, 'rb') as f:
+                data = pickle.load(f)
+
+            logger.info(f"✅ 从缓存加载 {timeframe} 数据: {len(data)} 条")
+            return data
+
+        except Exception as e:
+            logger.error(f"❌ 加载缓存失败 ({timeframe}): {e}")
+            return None
+
     def handle_klines_request(self, query_params):
         """处理K线数据请求"""
         try:
@@ -111,12 +141,50 @@ class UnifiedBacktestHandler(BaseHTTPRequestHandler):
                 return
 
             logger.info(f"📊 加载K线数据: {symbol} {start_date} 到 {end_date} 周期: {timeframe}")
-            
+
+            # 🚀 优先尝试加载预处理缓存
+            cached_data = self.load_cached_klines(timeframe)
+
+            if cached_data:
+                # 使用缓存数据，只需要过滤时间范围
+                start_ts = int(pd.to_datetime(start_date).timestamp())
+                end_ts = int(pd.to_datetime(end_date).timestamp())
+
+                # 过滤时间范围
+                filtered_klines = [
+                    kline for kline in cached_data
+                    if start_ts <= kline['time'] <= end_ts
+                ]
+
+                # 转换时间格式为前端需要的timestamp
+                for kline in filtered_klines:
+                    kline['timestamp'] = kline['time']
+                    # 添加成交额字段
+                    kline['quote_volume'] = kline['volume'] * kline['close']
+
+                response_data = {
+                    'success': True,
+                    'symbol': symbol,
+                    'start_date': start_date,
+                    'end_date': end_date,
+                    'timeframe': timeframe,
+                    'count': len(filtered_klines),
+                    'klines': filtered_klines,
+                    'source': 'cache'  # 标记数据来源
+                }
+
+                self.send_json_response(response_data)
+                logger.info(f"✅ 从缓存返回 {len(filtered_klines)} 条K线数据")
+                return
+
+            # 🔄 缓存不存在，回退到原始数据处理
+            logger.warning(f"⚠️ 缓存不存在，使用原始数据处理 {timeframe}")
+
             # 检查数据文件
             if not self.data_file.exists():
                 self.send_error_response(404, f"数据文件不存在: {self.data_file}")
                 return
-            
+
             # 加载数据
             df = pd.read_hdf(self.data_file, key='klines')
             
@@ -160,12 +228,14 @@ class UnifiedBacktestHandler(BaseHTTPRequestHandler):
                 'symbol': symbol,
                 'start_date': start_date,
                 'end_date': end_date,
+                'timeframe': timeframe,
                 'count': len(klines),
-                'klines': klines
+                'klines': klines,
+                'source': 'realtime'  # 标记数据来源
             }
-            
+
             self.send_json_response(response_data)
-            logger.info(f"✅ 成功返回 {len(klines)} 条K线数据")
+            logger.info(f"✅ 从原始数据返回 {len(klines)} 条K线数据")
             
         except Exception as e:
             logger.error(f"处理K线数据请求失败: {e}")

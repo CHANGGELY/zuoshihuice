@@ -75,17 +75,44 @@ def main():
             'verbose': False,  # 禁用详细输出
         })
 
-        # 更新策略配置
+        # 🎯 更新策略配置 - 与backtest_kline_trajectory.py完全一致
         STRATEGY_CONFIG.update({
             'leverage': int(params['leverage']),
-            'bid_spread': float(params['spreadThreshold']),
-            'ask_spread': float(params['spreadThreshold']),
-            'max_position_value_ratio': float(params['positionRatio']),
-            'position_size_ratio': float(params['orderRatio'])
+            'bid_spread': Decimal(str(params.get('bidSpread', 0.002))),
+            'ask_spread': Decimal(str(params.get('askSpread', 0.002))),
+            'position_size_ratio': Decimal(str(params.get('positionSizeRatio', 0.02))),
+            'max_position_value_ratio': Decimal(str(params.get('maxPositionRatio', 0.8))),
+            'order_refresh_time': float(params.get('orderRefreshTime', 30.0)),
+            'use_dynamic_order_size': bool(params.get('useDynamicOrderSize', True)),
+            'min_order_amount': Decimal(str(params.get('minOrderAmount', 0.008))),
+            'max_order_amount': Decimal(str(params.get('maxOrderAmount', 99.0))),
+            'position_stop_loss': Decimal(str(params.get('positionStopLoss', 0.05))),
+            'enable_position_stop_loss': bool(params.get('enablePositionStopLoss', False)),
+            'position_mode': params.get('positionMode', 'Hedge')
         })
 
+        # 🎯 更新市场配置（手续费参数）
+        if 'makerFee' in params or 'takerFee' in params:
+            from backtest_kline_trajectory import MARKET_CONFIG
+            MARKET_CONFIG.update({
+                'maker_fee': Decimal(str(params.get('makerFee', 0.0002))),
+                'taker_fee': Decimal(str(params.get('takerFee', 0.0005)))
+            })
+
+        # 🎯 更新返佣配置（返佣参数）
+        if 'useFeeRebate' in params or 'rebateRate' in params:
+            from backtest_kline_trajectory import REBATE_CONFIG
+            REBATE_CONFIG.update({
+                'use_fee_rebate': bool(params.get('useFeeRebate', True)),
+                'rebate_rate': Decimal(str(params.get('rebateRate', 0.30)))  # 🎯 默认30%与原配置一致
+            })
+
         progress.update(30, 100, "开始执行回测...")
-        
+
+        # 🔍 调试：打印最终配置
+        print(f"🔍 调试 - 最终BACKTEST_CONFIG: {BACKTEST_CONFIG}")
+        print(f"🔍 调试 - 最终STRATEGY_CONFIG: {STRATEGY_CONFIG}")
+
         # 执行回测 - 这里需要修改回测引擎来支持进度回调
         result = run_backtest_with_params_with_progress(progress)
         
