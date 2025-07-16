@@ -12,13 +12,45 @@ import hashlib
 import os
 
 # =====================================================================================
+# 🌊 ATR波动率自适应配置 - 方便手动调整
+# =====================================================================================
+ATR_CONFIG = {
+    # 🔧 主开关
+    "enable_volatility_adaptive": True,    # 启用波动率自适应机制
+
+    # 📊 ATR计算参数
+    "atr_period": 12 * 60,                # ATR计算周期 (12小时 = 720分钟)
+
+    # 🚨 波动率阈值设置
+    "high_volatility_threshold": 0.3,     # 高波动率阈值 30% - 启动仓位平衡机制
+    "enable_extreme_balance": False,       # 🔧 启用极端波动强制平衡机制
+    "extreme_volatility_threshold": 0.5,  # 极端波动率阈值 50% - 强制平衡到0 (应该>高波动阈值)
+
+    # 🎯 仓位平衡参数
+    "enable_position_balance": True,       # 🔧 启用仓位平衡机制
+
+    # 📏 动态网格间距参数
+    "enable_dynamic_spread": False,        # 🔧 启用动态网格间距调整
+    "base_spread": 0.002,                 # 基础价差 0.2%
+    "max_spread_multiplier": 5.0,         # 最大价差倍数 (极端波动时: 0.2% × 5.0 = 1.0%)
+    "spread_adjustment_factor": 3.0,      # 价差调整因子 (高波动时: 0.2% × 3.0 = 0.6%)
+
+    # 🚨 紧急风险控制参数
+    "enable_emergency_close": False,       # 🔧 启用紧急平仓机制
+    "emergency_close_threshold": 0.20,    # 紧急平仓阈值 20% - ATR达到此值强制清仓
+
+    # ⚙️ 其他设置
+    "gradual_adjustment": False,           # 启用渐进式调整 (平滑调整而非急剧变化)
+}
+
+# =====================================================================================
 # 回测配置
 # =====================================================================================
 BACKTEST_CONFIG = {
     "data_file_path": 'K线data/ETHUSDT_1m_2019-11-01_to_2025-06-15.h5',
-    "start_date": None,  # 🎯 与前端默认值一致
-    "end_date": None,    # 🎯 与前端默认值一致
-    "initial_balance": 600,      # 🎯 与前端默认值一致
+    "start_date": "2020-01-01",  # 🎯 与前端默认值一致
+    "end_date": "2020-12-31",    # 🎯 与前端默认值一致
+    "initial_balance": 1000,      # 🎯 与前端默认值一致
     "plot_equity_curve": True,
     "equity_curve_path": "equity_curve.png",
 }
@@ -31,6 +63,16 @@ MARKET_CONFIG = {
     "min_order_size": Decimal("0.009"),  # 最小下单量 (ETH) - 根据您的要求更新
     "maker_fee": Decimal("0.0002"),  # 挂单手续费 0.02%
     "taker_fee": Decimal("0.0005"),  # 吃单手续费 0.05%
+}
+
+# =====================================================================================
+# 💰 返佣配置
+# =====================================================================================
+REBATE_CONFIG = {
+    "use_fee_rebate": True,          # 是否启用返佣机制
+    "rebate_rate": Decimal("0.30"),  # 返佣比例 (30%)
+    "rebate_payout_day": 19,         # 每月返佣发放日
+    "usd_to_rmb_rate": 7.2,         # 美元兑人民币汇率
 }
 
 STRATEGY_CONFIG = {
@@ -74,13 +116,8 @@ ETH_USDC_TIERS = [
 ]
 
 # =====================================================================================
-# 新增：返佣机制配置
+# 新增：返佣机制配置 - 已移动到文件顶部，此处删除重复定义
 # =====================================================================================
-REBATE_CONFIG = {
-    "use_fee_rebate": True,          # 是否启用返佣机制
-    "rebate_rate": Decimal("0.30"),  # 返佣比例 (30%)
-    "rebate_payout_day": 19,         # 每月返佣发放日
-}
 
 # =====================================================================================
 # 新增：风险控制配置
@@ -91,6 +128,84 @@ RISK_CONFIG = {
     "min_equity": Decimal("300"),    # 当权益低于该值即退场 (USDT) - 提高阈值
     "max_daily_loss": Decimal("0.10"), # 单日最大亏损10%
 }
+
+
+
+# =====================================================================================
+# 波动率计算工具
+# =====================================================================================
+class VolatilityMonitor:
+    def __init__(self, atr_period: int = 1440):  # 默认24小时
+        self.atr_period = atr_period
+        self.price_history = []  # 存储 (timestamp, high, low, close)
+        self.atr_values = []
+
+    def update_price(self, timestamp: int, high: float, low: float, close: float):
+        """更新价格数据并计算ATR"""
+        self.price_history.append((timestamp, high, low, close))
+
+        # 保持历史数据在指定周期内
+        if len(self.price_history) > self.atr_period + 1:
+            self.price_history.pop(0)
+
+        # 计算ATR
+        if len(self.price_history) >= 2:
+            self._calculate_atr()
+
+    def _calculate_atr(self):
+        """计算平均真实波幅 (ATR)"""
+        if len(self.price_history) < 2:
+            return
+
+        true_ranges = []
+        for i in range(1, len(self.price_history)):
+            current = self.price_history[i]
+            previous = self.price_history[i-1]
+
+            # 真实波幅 = max(high-low, |high-prev_close|, |low-prev_close|)
+            tr1 = current[1] - current[2]  # high - low
+            tr2 = abs(current[1] - previous[3])  # |high - prev_close|
+            tr3 = abs(current[2] - previous[3])  # |low - prev_close|
+
+            true_range = max(tr1, tr2, tr3)
+            true_ranges.append(true_range)
+
+        # 计算ATR (简单移动平均)
+        if true_ranges:
+            atr = sum(true_ranges) / len(true_ranges)
+            self.atr_values.append(atr)
+
+            # 保持ATR历史在合理范围内
+            if len(self.atr_values) > 100:
+                self.atr_values.pop(0)
+
+    def get_current_atr_percentage(self) -> float:
+        """获取当前ATR相对于价格的百分比"""
+        if not self.atr_values or not self.price_history:
+            return 0.0
+
+        current_atr = self.atr_values[-1]
+        current_price = self.price_history[-1][3]  # close price
+
+        return (current_atr / current_price) * 100 if current_price > 0 else 0.0
+
+    def get_volatility_level(self) -> str:
+        """获取当前波动率等级"""
+        atr_pct = self.get_current_atr_percentage()
+
+        high_threshold = ATR_CONFIG["high_volatility_threshold"] * 100
+        extreme_threshold = ATR_CONFIG["extreme_volatility_threshold"] * 100
+
+        if atr_pct >= extreme_threshold:
+            return "EXTREME"
+        elif atr_pct >= high_threshold:
+            return "HIGH"
+        else:
+            return "NORMAL"
+
+    def should_reduce_exposure(self) -> bool:
+        """判断是否应该减少风险敞口"""
+        return self.get_volatility_level() in ["HIGH", "EXTREME"]
 
 # =====================================================================================
 # 高性能永续合约交易所模拟器
@@ -126,6 +241,12 @@ class FastPerpetualExchange:
         if REBATE_CONFIG.get("use_fee_rebate", False):
             self.last_payout_date = None # 用于跟踪上一次返佣的日期
             self.current_cycle_fees = Decimal("0")
+
+        # 🚀 新增：波动率监控
+        if ATR_CONFIG["enable_volatility_adaptive"]:
+            self.volatility_monitor = VolatilityMonitor(ATR_CONFIG["atr_period"])
+        else:
+            self.volatility_monitor = None
         
     def get_equity(self) -> Decimal:
         """获取当前总权益"""
@@ -294,6 +415,22 @@ class FastPerpetualExchange:
     
     def set_current_price(self, price: float):
         self.current_price = Decimal(str(price))
+
+    def update_volatility_monitor(self, timestamp: int, high: float, low: float, close: float):
+        """更新波动率监控数据"""
+        if self.volatility_monitor:
+            self.volatility_monitor.update_price(timestamp, high, low, close)
+
+    def get_volatility_info(self) -> dict:
+        """获取当前波动率信息"""
+        if not self.volatility_monitor:
+            return {"level": "NORMAL", "atr_percentage": 0.0, "should_reduce_exposure": False}
+
+        return {
+            "level": self.volatility_monitor.get_volatility_level(),
+            "atr_percentage": self.volatility_monitor.get_current_atr_percentage(),
+            "should_reduce_exposure": self.volatility_monitor.should_reduce_exposure()
+        }
     
     def place_orders_batch(self, orders: List[tuple]):
         self.active_buy_orders.clear()
@@ -555,19 +692,123 @@ class FastPerpetualStrategy:
 
         return orders
 
+    def calculate_adaptive_spread(self, current_price: Decimal) -> tuple:
+        """根据波动率计算自适应价差"""
+        base_spread = Decimal(str(ATR_CONFIG["base_spread"]))
+
+        # 🔧 检查动态网格间距开关
+        if not ATR_CONFIG["enable_dynamic_spread"] or not ATR_CONFIG["enable_volatility_adaptive"] or not self.exchange.volatility_monitor:
+            return base_spread, base_spread
+
+        volatility_info = self.exchange.get_volatility_info()
+        volatility_level = volatility_info["level"]
+
+        # 根据波动率等级调整价差
+        if volatility_level == "EXTREME":
+            multiplier = Decimal(str(ATR_CONFIG["max_spread_multiplier"]))
+        elif volatility_level == "HIGH":
+            multiplier = Decimal(str(ATR_CONFIG["spread_adjustment_factor"]))
+        else:
+            multiplier = Decimal("1.0")
+
+        adaptive_spread = base_spread * multiplier
+        return adaptive_spread, adaptive_spread
+
+    def check_position_balance(self, current_price: Decimal) -> List[tuple]:
+        """检查仓位平衡，在高波动期减少净敞口"""
+        if not ATR_CONFIG["enable_volatility_adaptive"] or not self.exchange.volatility_monitor:
+            return []
+
+        volatility_info = self.exchange.get_volatility_info()
+        atr_percentage = volatility_info["atr_percentage"]
+
+        # � 紧急平仓机制 (优先级最高)
+        if ATR_CONFIG["enable_emergency_close"]:
+            emergency_threshold = ATR_CONFIG["emergency_close_threshold"] * 100
+            if atr_percentage >= emergency_threshold:
+                # 紧急情况：强制平掉所有仓位
+                orders = []
+                if self.exchange.long_position > 0:
+                    orders.append(("sell_long", self.exchange.long_position, current_price))
+                if self.exchange.short_position > 0:
+                    orders.append(("buy_short", self.exchange.short_position, current_price))
+                if orders:
+                    print(f"🚨 紧急平仓！ATR={atr_percentage:.1f}% >= {emergency_threshold:.1f}%")
+                return orders
+
+        # 🎯 极端波动强制平衡机制 - 仅在极端波动时生成强制平衡订单
+        if not ATR_CONFIG["enable_extreme_balance"]:
+            return []
+
+        extreme_threshold = ATR_CONFIG["extreme_volatility_threshold"] * 100
+        if atr_percentage < extreme_threshold:
+            return []  # 未达到极端波动阈值
+
+        # 计算当前净持仓
+        net_position = self.exchange.get_net_position()
+        long_pos = self.exchange.long_position
+        short_pos = self.exchange.short_position
+
+        if long_pos == 0 and short_pos == 0:
+            return []
+
+        # � 极端波动：强制平衡到0
+        print(f"🔥 极端波动！ATR={atr_percentage:.1f}% - 强制平衡到中性")
+
+        orders = []
+        if net_position > 0:  # 多头过多，平多
+            if long_pos > 0:
+                orders.append(("sell_long", long_pos, current_price))
+        elif net_position < 0:  # 空头过多，平空
+            if short_pos > 0:
+                orders.append(("buy_short", short_pos, current_price))
+
+        return orders
+
+    def should_filter_signal(self, signal_type: str) -> bool:
+        """判断是否应该过滤某个交易信号 - 仅在ATR > 30%时过滤"""
+        if not ATR_CONFIG["enable_volatility_adaptive"] or not self.exchange.volatility_monitor:
+            return False
+
+        if not ATR_CONFIG["enable_position_balance"]:
+            return False
+
+        volatility_info = self.exchange.get_volatility_info()
+        atr_percentage = volatility_info["atr_percentage"]
+        high_threshold = ATR_CONFIG["high_volatility_threshold"] * 100
+
+        if atr_percentage < high_threshold:
+            return False  # ATR未达到高波动阈值，不过滤任何信号
+
+        # ATR > 30%时，根据当前仓位情况过滤信号
+        net_position = self.exchange.get_net_position()
+
+        if net_position > 0:  # 多头过多
+            # 过滤开多信号，保留开空、平多、平空信号
+            return signal_type == "buy_long"
+        elif net_position < 0:  # 空头过多
+            # 过滤开空信号，保留开多、平多、平空信号
+            return signal_type == "sell_short"
+        else:
+            return False  # 净持仓为0，不过滤任何信号
+
     def generate_orders(self, current_price: Decimal, timestamp: int) -> List[tuple]:
-        """🚀 超高性能订单生成 - 完全向量化优化版本"""
+        """🚀 波动率自适应订单生成 - 集成ATR风险控制"""
         # 1. 优先检查止损
         stop_loss_orders = self.check_position_stop_loss(current_price)
         if stop_loss_orders:
             return stop_loss_orders
 
+        # 2. 🚀 新增：检查波动率自适应仓位平衡
+        balance_orders = self.check_position_balance(current_price)
+        if balance_orders:
+            return balance_orders
+
         if not self.should_place_orders(timestamp):
             return []
 
-        # 🚀 性能优化：预计算所有常用值，避免重复计算
-        bid_spread = Decimal(str(STRATEGY_CONFIG["bid_spread"]))
-        ask_spread = Decimal(str(STRATEGY_CONFIG["ask_spread"]))
+        # 3. 🚀 新增：使用自适应价差
+        bid_spread, ask_spread = self.calculate_adaptive_spread(current_price)
         one_minus_bid = Decimal("1") - bid_spread
         one_plus_ask = Decimal("1") + ask_spread
         bid_price = current_price * one_minus_bid
@@ -620,14 +861,16 @@ class FastPerpetualStrategy:
             open_long_amount = self.calculate_dynamic_order_size(current_price)
             required_margin = (open_long_amount * bid_price) / effective_leverage_decimal
             if available_margin > required_margin * safety_margin_multiplier:  # 保留2倍安全边际
-                orders.append(("buy_long", open_long_amount, bid_price))
+                if not self.should_filter_signal("buy_long"):  # 🎯 ATR信号过滤
+                    orders.append(("buy_long", open_long_amount, bid_price))
 
         # 5. 检查是否可以开空仓
         if short_pos < half_max_position:
             open_short_amount = self.calculate_dynamic_order_size(current_price)
             required_margin = (open_short_amount * ask_price) / effective_leverage_decimal
             if available_margin > required_margin * safety_margin_multiplier:
-                orders.append(("sell_short", open_short_amount, ask_price))
+                if not self.should_filter_signal("sell_short"):  # 🎯 ATR信号过滤
+                    orders.append(("sell_short", open_short_amount, ask_price))
 
         # --- 平仓逻辑 ---
         # 6. 创建平多订单
@@ -727,6 +970,124 @@ def get_price_trajectory_vectorized(o: float, h: float, l: float, c: float, prev
         ]
 
 # =====================================================================================
+# 新增：返佣计算功能
+# =====================================================================================
+def calculate_monthly_rebates_from_trades(trade_history: List[dict]) -> List[tuple]:
+    """
+    基于真实交易记录计算每月19号的返佣金额（人民币）
+    返佣周期：上个月18号到这个月18号的手续费
+
+    Args:
+        trade_history: 交易历史记录 [{"timestamp": int, "fee": Decimal, ...}, ...]
+
+    Returns:
+        [(timestamp, rebate_amount_rmb), ...] 每月19号的返佣数据点
+    """
+    if not trade_history or not REBATE_CONFIG["use_fee_rebate"]:
+        return []
+
+    import datetime
+    from collections import defaultdict
+
+    # 返佣配置
+    rebate_rate = float(REBATE_CONFIG["rebate_rate"])  # 30%返佣率
+    usd_to_rmb = REBATE_CONFIG["usd_to_rmb_rate"]     # 美元兑人民币汇率
+    payout_day = REBATE_CONFIG["rebate_payout_day"]   # 19号发放
+
+    # 按返佣周期统计手续费
+    period_fees = defaultdict(float)  # {payout_timestamp: total_fees}
+
+    for trade in trade_history:
+        trade_timestamp = trade.get('timestamp', 0)
+        trade_fee = float(trade.get('fee', 0))
+
+        if trade_timestamp <= 0 or trade_fee <= 0:
+            continue
+
+        try:
+            trade_date = datetime.datetime.fromtimestamp(trade_timestamp)
+        except (ValueError, OverflowError):
+            continue
+
+        # 确定这笔交易属于哪个返佣周期
+        # 返佣周期：上月18号到本月18号，在本月19号发放
+        if trade_date.day >= 18:
+            # 18号及以后的交易，属于下个月19号发放的周期
+            if trade_date.month == 12:
+                payout_date = datetime.datetime(trade_date.year + 1, 1, payout_day)
+            else:
+                payout_date = datetime.datetime(trade_date.year, trade_date.month + 1, payout_day)
+        else:
+            # 18号之前的交易，属于本月19号发放的周期
+            payout_date = datetime.datetime(trade_date.year, trade_date.month, payout_day)
+
+        payout_timestamp = payout_date.timestamp()
+        period_fees[payout_timestamp] += trade_fee
+
+    # 生成返佣数据点
+    rebates = []
+    for payout_timestamp, total_period_fees in period_fees.items():
+        if total_period_fees > 0:
+            rebate_amount_usd = total_period_fees * rebate_rate
+            rebate_amount_rmb = rebate_amount_usd * usd_to_rmb
+            rebates.append((payout_timestamp, rebate_amount_rmb))
+
+    # 按时间排序
+    rebates.sort(key=lambda x: x[0])
+    return rebates
+
+def calculate_monthly_rebates(equity_history: List[tuple], total_fees: Decimal) -> List[tuple]:
+    """
+    兼容性函数：从权益历史计算返佣（简化版本）
+    注意：这个函数仅用于向后兼容，实际应该使用 calculate_monthly_rebates_from_trades
+    """
+    if not equity_history or not REBATE_CONFIG["use_fee_rebate"]:
+        return []
+
+    import datetime
+
+    # 返佣配置
+    rebate_rate = float(REBATE_CONFIG["rebate_rate"])
+    usd_to_rmb = REBATE_CONFIG["usd_to_rmb_rate"]
+    payout_day = REBATE_CONFIG["rebate_payout_day"]
+
+    # 简化计算：将总返佣按月平均分配
+    start_time = equity_history[0][0]
+    end_time = equity_history[-1][0]
+    total_rebate_usd = float(total_fees) * rebate_rate
+    total_rebate_rmb = total_rebate_usd * usd_to_rmb
+
+    # 计算返佣月份数
+    start_date = datetime.datetime.fromtimestamp(start_time)
+    end_date = datetime.datetime.fromtimestamp(end_time)
+
+    rebate_dates = []
+    current_date = start_date.replace(day=1)  # 从开始月份的1号开始
+
+    while current_date <= end_date:
+        try:
+            rebate_date = current_date.replace(day=payout_day)
+            if start_time <= rebate_date.timestamp() <= end_time:
+                rebate_dates.append(rebate_date.timestamp())
+        except ValueError:
+            pass
+
+        # 移动到下个月
+        if current_date.month == 12:
+            current_date = current_date.replace(year=current_date.year + 1, month=1)
+        else:
+            current_date = current_date.replace(month=current_date.month + 1)
+
+    # 平均分配返佣
+    rebates = []
+    if rebate_dates:
+        rebate_per_month = total_rebate_rmb / len(rebate_dates)
+        for rebate_timestamp in rebate_dates:
+            rebates.append((rebate_timestamp, rebate_per_month))
+
+    return rebates
+
+# =====================================================================================
 # 新增：资金曲线与性能指标
 # =====================================================================================
 def analyze_and_plot_performance(
@@ -739,8 +1100,10 @@ def analyze_and_plot_performance(
     win_rate: float = 0.0,
     profitable_trades: int = 0,
     total_trade_pairs: int = 0,
-    progress_reporter=None
+    progress_reporter=None,
+    trade_history: Optional[List[dict]] = None
 ) -> Dict:
+    import pandas as pd
     # total_funding参数保留用于未来扩展，当前版本暂不使用
     _ = total_funding  # 明确标记为未使用但保留
     if not equity_history:
@@ -851,12 +1214,17 @@ def analyze_and_plot_performance(
         print("✅ 图表字体设置为英文")
 
         plt.style.use('seaborn-v0_8-darkgrid')
-        fig, ax = plt.subplots(figsize=(15, 8))
-        # fig变量保留用于可能的图表保存功能
-        _ = fig  # 明确标记为当前未使用但保留
-        
-        ax.plot(df.index, df['equity'], label='Equity Curve', color='dodgerblue', linewidth=2)
-        ax.fill_between(df.index, df['peak'], df['equity'], facecolor='red', alpha=0.3, label='Drawdown')
+        fig, ax1 = plt.subplots(figsize=(16, 10))
+
+        # 左Y轴：资金曲线（USDT）
+        ax1.plot(df.index, df['equity'], label='Equity Curve', color='dodgerblue', linewidth=2)
+        ax1.fill_between(df.index, df['peak'], df['equity'], facecolor='red', alpha=0.3, label='Drawdown')
+
+        # 设置左Y轴格式为USDT，使用科学计数法或千分位
+        from matplotlib.ticker import FuncFormatter
+        ax1.yaxis.set_major_formatter(FuncFormatter(lambda x, _: f'{x:,.0f} USDT'))
+        ax1.set_ylabel('Equity (USDT)', fontsize=12, color='dodgerblue')
+        ax1.tick_params(axis='y', labelcolor='dodgerblue')
 
         # 🚀 添加参数信息到标题 (英文版)
         if strategy_params:
@@ -870,14 +1238,38 @@ def analyze_and_plot_performance(
         title = f'Equity Curve | Leverage: {leverage}x | Spread: ±{float(bid_spread)*100:.1f}% | Position: Auto (1/Leverage)'
         subtitle = f'Total Return: {total_return_pct:.1%} | Annualized: {annualized_return:.1%} | Max Drawdown: {max_drawdown:.1%}'
 
-        ax.set_title(title, fontsize=16, weight='bold', pad=20)
-        ax.text(0.5, 0.98, subtitle, transform=ax.transAxes, ha='center', va='top',
+        # 创建右Y轴用于显示月返佣（人民币）
+        ax2 = ax1.twinx()
+
+        # 计算月返佣数据（每月19号发放，基于上月18号到本月18号的真实手续费）
+        if trade_history:
+            monthly_rebates_rmb = calculate_monthly_rebates_from_trades(trade_history)
+        else:
+            # 向后兼容：如果没有交易历史，使用简化计算
+            monthly_rebates_rmb = calculate_monthly_rebates(equity_history, total_fees)
+        if monthly_rebates_rmb:
+            rebate_dates, rebate_amounts = zip(*monthly_rebates_rmb)
+            # 转换时间戳为pandas时间索引，与主图表保持一致
+            import pandas as pd
+            rebate_dates_pd = pd.to_datetime(rebate_dates, unit='s')
+            # 使用线图连接所有返佣点，而不是柱状图
+            ax2.plot(rebate_dates_pd, rebate_amounts, color='orange', linewidth=2, marker='o', markersize=6, label='Monthly Rebate (RMB)')
+            ax2.set_ylabel('Monthly Rebate (RMB)', fontsize=12, color='orange')
+            ax2.tick_params(axis='y', labelcolor='orange')
+            ax2.yaxis.set_major_formatter(FuncFormatter(lambda x, _: f'¥{x:,.0f}'))
+
+        ax1.set_title(title, fontsize=16, weight='bold', pad=20)
+        ax1.text(0.5, 0.98, subtitle, transform=ax1.transAxes, ha='center', va='top',
                 fontsize=12, bbox=dict(boxstyle='round,pad=0.3', facecolor='lightblue', alpha=0.7))
 
-        ax.set_xlabel('Date', fontsize=12)
-        ax.set_ylabel('Equity (USDT)', fontsize=12)
-        ax.legend(loc='upper left')
-        ax.grid(True, which='both', linestyle='--', linewidth=0.5)
+        ax1.set_xlabel('Date', fontsize=12)
+
+        # 合并图例
+        lines1, labels1 = ax1.get_legend_handles_labels()
+        lines2, labels2 = ax2.get_legend_handles_labels() if monthly_rebates_rmb else ([], [])
+        ax1.legend(lines1 + lines2, labels1 + labels2, loc='upper left')
+
+        ax1.grid(True, which='both', linestyle='--', linewidth=0.5)
         
         plt.xticks(rotation=45)
         plt.tight_layout()
@@ -931,13 +1323,14 @@ def save_preprocessed_data(cache_key: str, data: tuple):
     except Exception as e:
         print(f"⚠️ 缓存保存失败: {e}")
 
-def run_backtest_with_params(strategy_params: Optional[Dict] = None, market_params: Optional[Dict] = None, use_cache: bool = True) -> Dict:
+def run_backtest_with_params(strategy_params: Optional[Dict] = None, market_params: Optional[Dict] = None, backtest_params: Optional[Dict] = None, use_cache: bool = True) -> Dict:
     """
     使用指定参数运行回测，支持参数遍历
 
     Args:
         strategy_params: 策略参数覆盖
         market_params: 市场参数覆盖
+        backtest_params: 回测参数覆盖 (包含时间范围)
         use_cache: 是否使用数据缓存
 
     Returns:
@@ -946,13 +1339,29 @@ def run_backtest_with_params(strategy_params: Optional[Dict] = None, market_para
     # 备份原始配置
     original_strategy = STRATEGY_CONFIG.copy()
     original_market = MARKET_CONFIG.copy()
+    original_backtest = BACKTEST_CONFIG.copy()
 
     try:
         # 应用参数覆盖
         if strategy_params:
-            STRATEGY_CONFIG.update(strategy_params)
+            # 分离时间参数和策略参数
+            time_params = {}
+            pure_strategy_params = {}
+            for key, value in strategy_params.items():
+                if key in ['start_date', 'end_date']:
+                    time_params[key] = value
+                else:
+                    pure_strategy_params[key] = value
+
+            STRATEGY_CONFIG.update(pure_strategy_params)
+            if time_params:
+                BACKTEST_CONFIG.update(time_params)
+
         if market_params:
             MARKET_CONFIG.update(market_params)
+
+        if backtest_params:
+            BACKTEST_CONFIG.update(backtest_params)
 
         # 运行回测
         import asyncio
@@ -965,6 +1374,8 @@ def run_backtest_with_params(strategy_params: Optional[Dict] = None, market_para
         STRATEGY_CONFIG.update(original_strategy)
         MARKET_CONFIG.clear()
         MARKET_CONFIG.update(original_market)
+        BACKTEST_CONFIG.clear()
+        BACKTEST_CONFIG.update(original_backtest)
 
 def load_full_dataset_cache() -> Optional[tuple]:
     """加载全量数据集缓存"""
@@ -1145,6 +1556,9 @@ async def run_fast_perpetual_backtest(use_cache: bool = True):
             # K线结束，更新收盘价并记录权益
             prev_close = c  # 使用当前K线的收盘价
 
+            # 🚀 新增：更新波动率监控
+            exchange.update_volatility_monitor(kline_timestamp, h, l, c)
+
             # 🚀 修复：确保记录权益时的时间戳有效
             if kline_timestamp <= 2147483647 and kline_timestamp >= 0:
                 exchange.record_equity(kline_timestamp)
@@ -1260,7 +1674,9 @@ async def run_fast_perpetual_backtest(use_cache: bool = True):
         STRATEGY_CONFIG,  # 传递策略参数
         win_rate_temp,  # 传递胜率
         profitable_trades_temp,  # 传递盈利交易数
-        total_trade_pairs_temp  # 传递总交易对数
+        total_trade_pairs_temp,  # 传递总交易对数
+        None,  # progress_reporter
+        exchange.trade_history  # 🚀 传递真实交易历史用于返佣计算
     )
 
     if stopped_by_risk:
