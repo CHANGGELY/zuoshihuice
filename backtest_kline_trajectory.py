@@ -49,7 +49,7 @@ ATR_CONFIG = {
 BACKTEST_CONFIG = {
     "data_file_path": 'K线data/ETHUSDT_1m_2019-11-01_to_2025-06-15.h5',
     "start_date": "2020-01-01",  # 🎯 与前端默认值一致
-    "end_date": "2020-06-30",    # 🎯 与前端默认值一致
+    "end_date": "2020-05-20",    # 🎯 与前端默认值一致
     "initial_balance": 1000,      # 🎯 与前端默认值一致
     "plot_equity_curve": True,
     "equity_curve_path": "equity_curve.png",
@@ -76,25 +76,27 @@ REBATE_CONFIG = {
 }
 
 STRATEGY_CONFIG = {
-    "leverage": 5,  # 杠杆倍数 (降低杠杆测试币安标准)
+    "leverage": 125,  # 杠杆倍数
     "position_mode": "Hedge",  # 对冲模式
-    "bid_spread": Decimal("0.002"),  # 0.2% 买单价差 (增加价差)
-    "ask_spread": Decimal("0.002"),  # 0.2% 卖单价差
+    "spread": Decimal("0.004"),  # 价差 0.4% (平仓价与开仓价的价差)
 
-    # 动态下单量配置
-    "use_dynamic_order_size": True,  # 是否使用动态下单量
-    # position_size_ratio: 自动计算参数 = 1/当前有效杠杆，不可手动设置
-    "min_order_amount": Decimal("0.009"),   # 最小下单数量 (ETH) - 必须 >= min_order_size
-    "max_order_amount": Decimal("999.0"),    # 最大下单数量 (ETH) - 大幅降低
+    # 🎯 对冲网格策略核心参数
+    "position_size_ratio": Decimal("1.0"),  # 每次开仓占总权益比例 100%
+    "hedge_mode": True,  # 启用对冲模式（每个价位同时开多空）
 
-    # 🚀 币安标准：杠杆选择用总持仓，爆仓检查用净持仓，恢复80%比例
-    "max_position_value_ratio": Decimal("1"),  # 最大仓位价值不超过权益的100%
+    # ATR风控参数
+    "atr_threshold": Decimal("0.30"),  # ATR阈值 30%
+    "atr_period_hours": 12,  # ATR计算周期 12小时
+
+    # 订单管理
+    "min_order_amount": Decimal("0.009"),   # 最小下单数量 (ETH)
+    "max_order_amount": Decimal("999.0"),   # 最大下单数量 (ETH)
     "order_refresh_time": 15.0,  # 订单刷新时间(秒)
-    # 删除资金费率配置，因为数据中没有资金费率
 
-    # 新增：单笔止损配置
-    "position_stop_loss": Decimal("0.05"),  # 单个仓位5%止损
+    # 风险控制
+    "max_position_value_ratio": Decimal("1"),  # 最大仓位价值比例
     "enable_position_stop_loss": False,  # 启用单笔止损
+    "position_stop_loss": Decimal("0.05"),  # 单个仓位5%止损
 }
 
 # =====================================================================================
@@ -326,7 +328,8 @@ class FastPerpetualExchange:
         # 使用动态计算的维持保证金
         maintenance_margin = self.get_maintenance_margin()
 
-        if equity <= maintenance_margin and equity > 0: # 仅在权益大于0时触发
+        # 🔧 修复关键bug：权益低于维持保证金或变成负数时都应该爆仓
+        if equity <= maintenance_margin:
             # --- 爆仓事件 ---
             liquidation_price = self.current_price
             
@@ -647,37 +650,35 @@ class FastPerpetualStrategy:
         self.last_order_time = 0
         
     def calculate_dynamic_order_size(self, current_price: Decimal) -> Decimal:
-        if not STRATEGY_CONFIG["use_dynamic_order_size"]:
-            return STRATEGY_CONFIG["min_order_amount"]
+        """计算对冲网格策略的开仓量
 
+        策略逻辑：
+        - 每次开仓使用全部可用权益
+        - 125倍杠杆下，保证金 = 权益 / 125 = 8U
+        - 开仓价值 = 保证金 × 125 = 1000U
+        """
         current_equity = self.exchange.get_equity()
+        leverage = STRATEGY_CONFIG["leverage"]
 
-        # 🚀 修复：正确区分保证金和开仓价值
-        current_max_leverage = self.exchange.get_current_max_leverage()
-        effective_leverage = min(current_max_leverage, STRATEGY_CONFIG["leverage"])
+        # 🎯 对冲网格策略：每次开仓使用全部权益
+        position_size_ratio = STRATEGY_CONFIG["position_size_ratio"]  # 100%
+        target_position_value = current_equity * position_size_ratio
 
-        # 🔧 修复关键错误：应该基于目标开仓价值，而不是保证金
-        # 目标开仓价值 = 当前权益 × 固定比例（比如1%）
-        target_position_value_ratio = Decimal("0.01")  # 每次开仓占权益的1%
-        target_position_value = current_equity * target_position_value_ratio
-
-        # 基于目标开仓价值计算下单数量
-        order_amount = target_position_value / current_price
-
-        # 验证保证金是否足够
-        required_margin = target_position_value / Decimal(str(effective_leverage))
+        # 计算所需保证金
+        required_margin = target_position_value / Decimal(str(leverage))
         available_margin = self.exchange.get_available_margin()
 
-        # 如果保证金不足，按可用保证金调整
-        if required_margin > available_margin * Decimal("0.5"):  # 保留50%安全边际
-            adjusted_position_value = available_margin * Decimal("0.5") * Decimal(str(effective_leverage))
-            order_amount = adjusted_position_value / current_price
+        # 如果保证金不足，按可用保证金计算
+        if required_margin > available_margin:
+            target_position_value = available_margin * Decimal(str(leverage))
+
+        # 基于开仓价值计算下单数量
+        order_amount = target_position_value / current_price
 
         # 确保最小下单量符合市场要求
-        min_amount = max(STRATEGY_CONFIG["min_order_amount"], current_equity / 1000 / current_price)
+        min_amount = STRATEGY_CONFIG["min_order_amount"]
         max_amount = STRATEGY_CONFIG["max_order_amount"]
 
-        # 确保下单量在最小和最大值之间
         return max(min_amount, min(max_amount, order_amount))
     
     def should_place_orders(self, timestamp: int) -> bool:
@@ -808,100 +809,102 @@ class FastPerpetualStrategy:
             return False  # 净持仓为0，不过滤任何信号
 
     def generate_orders(self, current_price: Decimal, timestamp: int) -> List[tuple]:
-        """🚀 波动率自适应订单生成 - 集成ATR风险控制"""
+        """🎯 对冲网格策略订单生成
+
+        策略逻辑：
+        1. ATR < 30%: 每个价位同时开多+开空（对冲模式）
+        2. ATR >= 30%: 仓位平衡模式，使净持仓趋向0
+        3. 每次开仓都挂限价平仓单
+        """
         # 1. 优先检查止损
         stop_loss_orders = self.check_position_stop_loss(current_price)
         if stop_loss_orders:
             return stop_loss_orders
 
-        # 2. 🚀 新增：检查波动率自适应仓位平衡
-        balance_orders = self.check_position_balance(current_price)
-        if balance_orders:
-            return balance_orders
-
         if not self.should_place_orders(timestamp):
             return []
 
-        # 3. 🚀 新增：使用自适应价差
-        bid_spread, ask_spread = self.calculate_adaptive_spread(current_price)
-        one_minus_bid = Decimal("1") - bid_spread
-        one_plus_ask = Decimal("1") + ask_spread
-        bid_price = current_price * one_minus_bid
-        ask_price = current_price * one_plus_ask
+        # 2. 获取当前ATR状态
+        current_atr = self.get_current_atr()
+        atr_threshold = STRATEGY_CONFIG["atr_threshold"]
 
-        # 🚀 性能优化：批量缓存所有需要的属性，减少方法调用
+        # 3. 计算价差（统一使用一个价差参数）
+        spread = STRATEGY_CONFIG["spread"]  # 0.4%
+
+        # 4. 获取当前仓位信息
         long_pos = self.exchange.long_position
         short_pos = self.exchange.short_position
-        current_equity = self.exchange.get_equity()
+        net_position = long_pos - short_pos
         available_margin = self.exchange.get_available_margin()
 
-        # 初始化订单列表
         orders = []
 
-        # 2. 基于阶梯保证金的动态仓位限制
-        current_max_leverage = self.exchange.get_current_max_leverage()
+        # 5. ATR风控：当ATR >= 30%时，执行仓位平衡
+        if current_atr >= atr_threshold:
+            return self.generate_balance_orders(current_price, net_position, spread)
 
-        # 获取当前档位信息
-        threshold, max_leverage, _, _ = self.exchange.get_current_leverage_tier()
+        # 6. 正常模式：对冲开仓（同时开多空）
+        if STRATEGY_CONFIG["hedge_mode"]:
+            return self.generate_hedge_orders(current_price, spread, available_margin)
 
-        # 🚀 完全动态计算最大仓位：基于当前权益、杠杆档位和风险控制比例
-        max_position_value_ratio = Decimal(str(STRATEGY_CONFIG["max_position_value_ratio"]))
-
-        # 计算当前档位下的最大仓位价值
-        max_position_value_in_tier = min(
-            threshold,  # 不超过当前档位上限
-            current_equity * Decimal(str(max_leverage)) * max_position_value_ratio  # 基于权益和风险比例
-        )
-
-        # 转换为ETH数量 - 这就是最终的最大仓位限制
-        max_position_size = max_position_value_in_tier / current_price
-
-        # 🚀 币安标准：检查总仓位风险 (多仓价值 + 空仓价值)
-        total_position_value = (long_pos + short_pos) * current_price
-        if total_position_value > max_position_value_in_tier:
-            # 总持仓价值过大，暂停开仓 (符合币安阶梯保证金规则)
-            return []
-
-        # --- 开仓逻辑 (基于动态杠杆) ---
-        # 使用当前档位的有效杠杆
-        effective_leverage = min(current_max_leverage, STRATEGY_CONFIG["leverage"])
-
-        # 🚀 性能优化：预计算常用值
-        half_max_position = max_position_size * Decimal("0.5")
-        safety_margin_multiplier = Decimal("2")
-        effective_leverage_decimal = Decimal(str(effective_leverage))
-
-        # 4. 检查是否可以开多仓
-        if long_pos < half_max_position:  # 单边仓位不超过总限制的50%
-            open_long_amount = self.calculate_dynamic_order_size(current_price)
-            required_margin = (open_long_amount * bid_price) / effective_leverage_decimal
-            if available_margin > required_margin * safety_margin_multiplier:  # 保留2倍安全边际
-                if not self.should_filter_signal("buy_long"):  # 🎯 ATR信号过滤
-                    orders.append(("buy_long", open_long_amount, bid_price))
-
-        # 5. 检查是否可以开空仓
-        if short_pos < half_max_position:
-            open_short_amount = self.calculate_dynamic_order_size(current_price)
-            required_margin = (open_short_amount * ask_price) / effective_leverage_decimal
-            if available_margin > required_margin * safety_margin_multiplier:
-                if not self.should_filter_signal("sell_short"):  # 🎯 ATR信号过滤
-                    orders.append(("sell_short", open_short_amount, ask_price))
-
-        # --- 平仓逻辑 ---
-        # 6. 创建平多订单
-        if long_pos > 0:
-            close_long_amount = self.calculate_dynamic_order_size(current_price)
-            close_price = ask_price * (Decimal("1") + ask_spread)
-            orders.append(("sell_long", min(close_long_amount, long_pos), close_price))
-
-        # 7. 创建平空订单
-        if short_pos > 0:
-            close_short_amount = self.calculate_dynamic_order_size(current_price)
-            close_price = bid_price * (Decimal("1") - bid_spread)
-            orders.append(("buy_short", min(close_short_amount, short_pos), close_price))
-
+        # 7. 兜底：返回空订单
         self.last_order_time = timestamp
         return orders
+
+    def generate_hedge_orders(self, current_price: Decimal, spread: Decimal, available_margin: Decimal) -> List[tuple]:
+        """生成对冲开仓订单（同时开多空）"""
+        orders = []
+
+        # 计算开仓量
+        order_amount = self.calculate_dynamic_order_size(current_price)
+        leverage = STRATEGY_CONFIG["leverage"]
+
+        # 计算所需保证金（开多+开空需要双倍保证金）
+        position_value = order_amount * current_price
+        required_margin_per_side = position_value / Decimal(str(leverage))
+        total_required_margin = required_margin_per_side * Decimal("2")  # 双向开仓
+
+        # 检查保证金是否足够
+        if available_margin < total_required_margin:
+            return []
+
+        # 🎯 对冲开仓：同时开多和开空
+        orders.append(("buy_long", order_amount, current_price))   # 开多
+        orders.append(("sell_short", order_amount, current_price)) # 开空
+
+        # 🎯 同时挂限价平仓单
+        long_close_price = current_price * (Decimal("1") + spread)  # 多头止盈价
+        short_close_price = current_price * (Decimal("1") - spread) # 空头止盈价
+
+        orders.append(("sell_long", order_amount, long_close_price))   # 平多限价单
+        orders.append(("buy_short", order_amount, short_close_price))  # 平空限价单
+
+        return orders
+
+    def generate_balance_orders(self, current_price: Decimal, net_position: Decimal, spread: Decimal) -> List[tuple]:
+        """生成仓位平衡订单（ATR >= 30%时）"""
+        orders = []
+
+        # ATR风控：使净持仓趋向0
+        if abs(net_position) < Decimal("0.001"):  # 净持仓已经很小
+            return []
+
+        balance_amount = abs(net_position) * Decimal("0.5")  # 每次平衡50%
+
+        if net_position > 0:  # 多头过多
+            # 只平多或开空
+            orders.append(("sell_long", balance_amount, current_price))
+        else:  # 空头过多
+            # 只平空或开多
+            orders.append(("buy_short", balance_amount, current_price))
+
+        return orders
+
+    def get_current_atr(self) -> Decimal:
+        """获取当前ATR值"""
+        # 这里需要实现ATR计算逻辑
+        # 暂时返回一个默认值，后续完善
+        return Decimal("0.20")  # 20%，低于30%阈值
 
 # =====================================================================================
 # 恢复K线价格轨迹
@@ -1501,6 +1504,12 @@ async def run_fast_perpetual_backtest(use_cache: bool = True):
     stopped_by_risk = False
     peak_equity = Decimal(str(BACKTEST_CONFIG["initial_balance"]))
 
+    # 🕒 添加时间估算变量
+    import time
+    start_time = time.time()
+    last_update_time = start_time
+    update_interval = 10000  # 每10000条更新一次时间估算
+
     with tqdm(total=data_length, desc="回测进度", unit="K线") as pbar:
         for i in range(data_length):
             # 直接从numpy数组访问，比pandas iloc更快
@@ -1575,11 +1584,31 @@ async def run_fast_perpetual_backtest(use_cache: bool = True):
             if i % 10000 == 0 and i > 0: # 进度条更新频率改为10000，减少50%的UI开销
                 current_balance = exchange.balance + exchange.get_unrealized_pnl()
                 pnl = current_balance - Decimal(str(BACKTEST_CONFIG["initial_balance"]))
+
+                # 🕒 计算预计完成时间
+                current_time = time.time()
+                elapsed_time = current_time - start_time
+                progress_ratio = i / data_length
+
+                if progress_ratio > 0:
+                    estimated_total_time = elapsed_time / progress_ratio
+                    remaining_time = estimated_total_time - elapsed_time
+                    remaining_minutes = int(remaining_time / 60)
+                    remaining_seconds = int(remaining_time % 60)
+
+                    if remaining_minutes > 0:
+                        time_str = f"还剩{remaining_minutes}分{remaining_seconds}秒"
+                    else:
+                        time_str = f"还剩{remaining_seconds}秒"
+                else:
+                    time_str = "计算中..."
+
                 pbar.set_postfix({
                     '交易': len(exchange.trade_history),
                     '盈亏': f'{pnl:.2f}U',
                     '多仓': f'{exchange.long_position:.2f}',
-                    '空仓': f'{exchange.short_position:.2f}'
+                    '空仓': f'{exchange.short_position:.2f}',
+                    '预计': time_str
                 })
     
     # 4. 输出最终结果
