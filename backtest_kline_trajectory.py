@@ -1036,56 +1036,23 @@ def calculate_monthly_rebates_from_trades(trade_history: List[dict]) -> List[tup
     rebates.sort(key=lambda x: x[0])
     return rebates
 
-def calculate_monthly_rebates(equity_history: List[tuple], total_fees: Decimal) -> List[tuple]:
-    """
-    兼容性函数：从权益历史计算返佣（简化版本）
-    注意：这个函数仅用于向后兼容，实际应该使用 calculate_monthly_rebates_from_trades
-    """
-    if not equity_history or not REBATE_CONFIG["use_fee_rebate"]:
-        return []
+def format_number_with_units(value, pos=None):
+    """格式化数字为K/M单位显示，避免一堆0不直观"""
+    if abs(value) >= 1_000_000:
+        return f'{value/1_000_000:.1f}M'
+    elif abs(value) >= 1_000:
+        return f'{value/1_000:.1f}K'
+    else:
+        return f'{value:.0f}'
 
-    import datetime
-
-    # 返佣配置
-    rebate_rate = float(REBATE_CONFIG["rebate_rate"])
-    usd_to_rmb = REBATE_CONFIG["usd_to_rmb_rate"]
-    payout_day = REBATE_CONFIG["rebate_payout_day"]
-
-    # 简化计算：将总返佣按月平均分配
-    start_time = equity_history[0][0]
-    end_time = equity_history[-1][0]
-    total_rebate_usd = float(total_fees) * rebate_rate
-    total_rebate_rmb = total_rebate_usd * usd_to_rmb
-
-    # 计算返佣月份数
-    start_date = datetime.datetime.fromtimestamp(start_time)
-    end_date = datetime.datetime.fromtimestamp(end_time)
-
-    rebate_dates = []
-    current_date = start_date.replace(day=1)  # 从开始月份的1号开始
-
-    while current_date <= end_date:
-        try:
-            rebate_date = current_date.replace(day=payout_day)
-            if start_time <= rebate_date.timestamp() <= end_time:
-                rebate_dates.append(rebate_date.timestamp())
-        except ValueError:
-            pass
-
-        # 移动到下个月
-        if current_date.month == 12:
-            current_date = current_date.replace(year=current_date.year + 1, month=1)
-        else:
-            current_date = current_date.replace(month=current_date.month + 1)
-
-    # 平均分配返佣
-    rebates = []
-    if rebate_dates:
-        rebate_per_month = total_rebate_rmb / len(rebate_dates)
-        for rebate_timestamp in rebate_dates:
-            rebates.append((rebate_timestamp, rebate_per_month))
-
-    return rebates
+def format_currency_with_units(value, pos=None):
+    """格式化货币数字为K/M单位显示（带货币符号）"""
+    if abs(value) >= 1_000_000:
+        return f'¥{value/1_000_000:.1f}M'
+    elif abs(value) >= 1_000:
+        return f'¥{value/1_000:.1f}K'
+    else:
+        return f'¥{value:.0f}'
 
 # =====================================================================================
 # 新增：资金曲线与性能指标
@@ -1220,9 +1187,9 @@ def analyze_and_plot_performance(
         ax1.plot(df.index, df['equity'], label='Equity Curve', color='dodgerblue', linewidth=2)
         ax1.fill_between(df.index, df['peak'], df['equity'], facecolor='red', alpha=0.3, label='Drawdown')
 
-        # 设置左Y轴格式为USDT，使用科学计数法或千分位
+        # 设置左Y轴格式为USDT，使用K/M单位显示
         from matplotlib.ticker import FuncFormatter
-        ax1.yaxis.set_major_formatter(FuncFormatter(lambda x, _: f'{x:,.0f} USDT'))
+        ax1.yaxis.set_major_formatter(FuncFormatter(lambda x, _: f'{format_number_with_units(x)} USDT'))
         ax1.set_ylabel('Equity (USDT)', fontsize=12, color='dodgerblue')
         ax1.tick_params(axis='y', labelcolor='dodgerblue')
 
@@ -1245,8 +1212,8 @@ def analyze_and_plot_performance(
         if trade_history:
             monthly_rebates_rmb = calculate_monthly_rebates_from_trades(trade_history)
         else:
-            # 向后兼容：如果没有交易历史，使用简化计算
-            monthly_rebates_rmb = calculate_monthly_rebates(equity_history, total_fees)
+            # 没有交易历史时，不显示返佣数据
+            monthly_rebates_rmb = []
         if monthly_rebates_rmb:
             rebate_dates, rebate_amounts = zip(*monthly_rebates_rmb)
             # 转换时间戳为pandas时间索引，与主图表保持一致
@@ -1256,7 +1223,7 @@ def analyze_and_plot_performance(
             ax2.plot(rebate_dates_pd, rebate_amounts, color='orange', linewidth=2, marker='o', markersize=6, label='Monthly Rebate (RMB)')
             ax2.set_ylabel('Monthly Rebate (RMB)', fontsize=12, color='orange')
             ax2.tick_params(axis='y', labelcolor='orange')
-            ax2.yaxis.set_major_formatter(FuncFormatter(lambda x, _: f'¥{x:,.0f}'))
+            ax2.yaxis.set_major_formatter(FuncFormatter(lambda x, _: format_currency_with_units(x)))
 
         ax1.set_title(title, fontsize=16, weight='bold', pad=20)
         ax1.text(0.5, 0.98, subtitle, transform=ax1.transAxes, ha='center', va='top',
