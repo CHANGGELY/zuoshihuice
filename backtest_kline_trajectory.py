@@ -49,7 +49,7 @@ ATR_CONFIG = {
 BACKTEST_CONFIG = {
     "data_file_path": 'K线data/ETHUSDT_1m_2019-11-01_to_2025-06-15.h5',
     "start_date": "2020-01-01",  # 🎯 与前端默认值一致
-    "end_date": "2020-12-31",    # 🎯 与前端默认值一致
+    "end_date": "2020-06-30",    # 🎯 与前端默认值一致
     "initial_balance": 1000,      # 🎯 与前端默认值一致
     "plot_equity_curve": True,
     "equity_curve_path": "equity_curve.png",
@@ -76,7 +76,7 @@ REBATE_CONFIG = {
 }
 
 STRATEGY_CONFIG = {
-    "leverage": 125,  # 杠杆倍数 (降低杠杆测试币安标准)
+    "leverage": 5,  # 杠杆倍数 (降低杠杆测试币安标准)
     "position_mode": "Hedge",  # 对冲模式
     "bid_spread": Decimal("0.002"),  # 0.2% 买单价差 (增加价差)
     "ask_spread": Decimal("0.002"),  # 0.2% 卖单价差
@@ -478,8 +478,10 @@ class FastPerpetualExchange:
         return filled_count
     
     def execute_fast_trade(self, side: str, amount: Decimal, price: Decimal, timestamp: int):
-        """快速交易执行 - 增加历史记录并修复手续费bug"""
-        fee = amount * price * MARKET_CONFIG["maker_fee"]
+        """快速交易执行 - 修复手续费计算逻辑"""
+        # 🔧 修复关键错误：手续费应该基于开仓价值，而不是保证金
+        position_value = amount * price  # 实际开仓价值
+        fee = position_value * MARKET_CONFIG["maker_fee"]  # 基于开仓价值计算手续费
         self.balance -= fee
         self.total_fees_paid += fee
 
@@ -650,13 +652,26 @@ class FastPerpetualStrategy:
 
         current_equity = self.exchange.get_equity()
 
-        # 🚀 动态计算position_size_ratio = 1 / 当前有效杠杆
+        # 🚀 修复：正确区分保证金和开仓价值
         current_max_leverage = self.exchange.get_current_max_leverage()
         effective_leverage = min(current_max_leverage, STRATEGY_CONFIG["leverage"])
-        dynamic_position_ratio = Decimal("1") / Decimal(str(effective_leverage))
 
-        order_value = current_equity * dynamic_position_ratio
-        order_amount = order_value / current_price
+        # 🔧 修复关键错误：应该基于目标开仓价值，而不是保证金
+        # 目标开仓价值 = 当前权益 × 固定比例（比如1%）
+        target_position_value_ratio = Decimal("0.01")  # 每次开仓占权益的1%
+        target_position_value = current_equity * target_position_value_ratio
+
+        # 基于目标开仓价值计算下单数量
+        order_amount = target_position_value / current_price
+
+        # 验证保证金是否足够
+        required_margin = target_position_value / Decimal(str(effective_leverage))
+        available_margin = self.exchange.get_available_margin()
+
+        # 如果保证金不足，按可用保证金调整
+        if required_margin > available_margin * Decimal("0.5"):  # 保留50%安全边际
+            adjusted_position_value = available_margin * Decimal("0.5") * Decimal(str(effective_leverage))
+            order_amount = adjusted_position_value / current_price
 
         # 确保最小下单量符合市场要求
         min_amount = max(STRATEGY_CONFIG["min_order_amount"], current_equity / 1000 / current_price)
