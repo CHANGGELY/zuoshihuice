@@ -1,0 +1,78 @@
+# 依赖和构建文件
+node_modules
+build
+dist
+.git
+.trae
+.log
+
+# 大型数据文件
+*.h5
+*.csv
+*.pkl
+*.parquet
+*.db
+*.sqlite
+*.sqlite3
+
+# 缓存和临时文件
+cache/
+K线data/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.so
+.pytest_cache/
+.coverage
+.nyc_output
+
+# 虚拟环境
+.venv/
+venv/
+env/
+.env
+
+# 备份和日志文件
+backup_deleted_files/
+*.log
+*.out
+*.err
+logs/
+
+# Docker相关
+Dockerfile
+docker-compose*.yml
+.dockerignore
+
+# 开发工具配置
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# 测试文件
+tests/
+test_*.py
+*_test.py
+
+# 文档和说明文件
+*.md
+docs/
+
+# Python特定文件
+requirements.txt
+*.py
+!api/
+
+# 数据库相关
+database/
+migrations/
+
+# 其他大文件
+*.zip
+*.tar.gz
+*.rar
+*.7z
