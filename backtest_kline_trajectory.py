@@ -47,7 +47,7 @@ ATR_CONFIG = {
 # 回测配置
 # =====================================================================================
 BACKTEST_CONFIG = {
-    "data_file_path": 'K线data/ETHUSDT_1m_2019-11-01_to_2025-06-15.h5',
+    "data_file_path": 'zuoshihuice/ETHUSDT_1m_2019-11-01_to_2025-06-15.h5',
     "start_date": "2020-01-01",  # 🎯 与前端默认值一致
     "end_date": "2020-05-20",    # 🎯 与前端默认值一致
     "initial_balance": 1000,      # 🎯 与前端默认值一致
@@ -901,10 +901,20 @@ class FastPerpetualStrategy:
         return orders
 
     def get_current_atr(self) -> Decimal:
-        """获取当前ATR值"""
-        # 这里需要实现ATR计算逻辑
-        # 暂时返回一个默认值，后续完善
-        return Decimal("0.20")  # 20%，低于30%阈值
+        """获取当前ATR占比(0-1)，根据VolatilityMonitor计算的ATR与收盘价"""
+        monitor = getattr(self.exchange, "volatility_monitor", None)
+        if not monitor or not getattr(monitor, "atr_values", None) or not getattr(monitor, "price_history", None):
+            return Decimal("0")
+        if not monitor.atr_values or not monitor.price_history:
+            return Decimal("0")
+
+        current_atr = monitor.atr_values[-1]  # float
+        current_close = monitor.price_history[-1][3]  # float (close)
+        if not current_close or current_close <= 0:
+            return Decimal("0")
+
+        ratio = current_atr / current_close  # 例如0.30表示30%
+        return Decimal(str(ratio))
 
 # =====================================================================================
 # 恢复K线价格轨迹
