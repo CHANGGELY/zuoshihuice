@@ -1,6 +1,7 @@
 # TODO:
 
-- [x] check_typescript_errors: 检查当前的2个TypeScript编译错误 - 没有发现编译错误 (priority: High)
-- [x] fix_typescript_errors: 修复发现的TypeScript编译错误 - 无需修复 (priority: High)
-- [x] fix_kline_chart_display: 修复K线图显示问题 - 从折线图改为K柱（蜡烛图），支持放大缩小 (priority: High)
-- [x] verify_fixes: 验证修复效果 - TypeScript编译通过，K线图组件已修复 (priority: Medium)
+- [x] remove_hardcoded_path: 删除H5Reader.ts中硬编码的H5_FILE_PATH常量 (priority: High)
+- [x] import_config: 在H5Reader.ts中导入配置文件 (priority: High)
+- [x] update_constructor: 修改H5Reader构造函数使用配置文件中的路径 (priority: High)
+- [x] add_file_validation: 添加H5文件存在性和可读性验证 (priority: Medium)
+- [x] test_h5_reader: 测试修复后的H5Reader功能 (priority: Medium)

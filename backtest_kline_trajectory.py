@@ -47,7 +47,7 @@ ATR_CONFIG = {
 # 回测配置
 # =====================================================================================
 BACKTEST_CONFIG = {
-    "data_file_path": 'zuoshihuice/ETHUSDT_1m_2019-11-01_to_2025-06-15.h5',
+    "data_file_path": 'ETHUSDT_1m_test_2020-01-01_to_2020-01-03.h5',
     "start_date": "2020-01-01",  # 🎯 与前端默认值一致
     "end_date": "2020-05-20",    # 🎯 与前端默认值一致
     "initial_balance": 1000,      # 🎯 与前端默认值一致
@@ -79,6 +79,7 @@ STRATEGY_CONFIG = {
     "leverage": 125,  # 杠杆倍数
     "position_mode": "Hedge",  # 对冲模式
     "spread": Decimal("0.004"),  # 价差 0.4% (平仓价与开仓价的价差)
+    "bid_spread": Decimal("0.004"),  # 做市价差 0.4%
 
     # 🎯 对冲网格策略核心参数
     "position_size_ratio": Decimal("1.0"),  # 每次开仓占总权益比例 100%
@@ -92,6 +93,7 @@ STRATEGY_CONFIG = {
     "min_order_amount": Decimal("0.009"),   # 最小下单数量 (ETH)
     "max_order_amount": Decimal("999.0"),   # 最大下单数量 (ETH)
     "order_refresh_time": 15.0,  # 订单刷新时间(秒)
+    "use_dynamic_order_size": True,  # 启用动态订单大小
 
     # 风险控制
     "max_position_value_ratio": Decimal("1"),  # 最大仓位价值比例
@@ -1478,7 +1480,14 @@ async def run_fast_perpetual_backtest(use_cache: bool = True):
     
     # 1. 快速加载数据
     print("📂 加载历史数据...")
-    df = pd.read_hdf(BACKTEST_CONFIG["data_file_path"], key='klines')
+    import h5py
+    with h5py.File(BACKTEST_CONFIG["data_file_path"], 'r') as f:
+        data = f['kline_data'][:]
+    # 假设数据列顺序为: timestamp, open, high, low, close, volume, ...
+    columns = ['timestamp', 'open', 'high', 'low', 'close', 'volume', 'turnover', 'amount', 'quote_volume', 'quoteVolume', 'quote_asset_volume']
+    df = pd.DataFrame(data, columns=columns[:data.shape[1]])
+    # 确保timestamp列是datetime格式
+    df['timestamp'] = pd.to_datetime(df['timestamp'], unit='ms')
 
     test_data = df
     if BACKTEST_CONFIG.get("start_date"):
