@@ -1,0 +1,71 @@
+#root {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 2rem;
+  text-align: center;
+}
+
+.App {
+  padding: 20px;
+}
+
+.App-header {
+  background-color: #282c34;
+  padding: 40px;
+  color: white;
+  border-radius: 10px;
+  margin-bottom: 20px;
+}
+
+.App-header h1 {
+  font-size: 2.5rem;
+  margin-bottom: 20px;
+  color: #61dafb;
+}
+
+.App-header p {
+  font-size: 1.2rem;
+  margin-bottom: 30px;
+}
+
+.system-info, .features {
+  background-color: #f8f9fa;
+  color: #333;
+  padding: 20px;
+  margin: 20px 0;
+  border-radius: 8px;
+  text-align: left;
+}
+
+.system-info h2, .features h2 {
+  color: #2c3e50;
+  margin-bottom: 15px;
+  font-size: 1.5rem;
+}
+
+.system-info ul, .features ul {
+  list-style: none;
+  padding: 0;
+}
+
+.system-info li, .features li {
+  padding: 8px 0;
+  font-size: 1.1rem;
+  border-bottom: 1px solid #e9ecef;
+}
+
+.system-info li:last-child, .features li:last-child {
+  border-bottom: none;
+}
+
+@media (max-width: 768px) {
+  .App-header {
+    padding: 20px;
+  }
+  
+  .App-header h1 {
+    font-size: 2rem;
+  }
+  
+  .system-info, .features {
+    padding: 15px;

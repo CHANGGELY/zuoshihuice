@@ -1,0 +1,28 @@
+{
+  "curl_examples": {
+    "register": {
+      "description": "用户注册",
+      "command": "curl -X POST http://localhost:8000/api/auth/register -H 'Content-Type: application/json' -d '{\"username\": \"testuser\", \"email\": \"test@example.com\", \"password\": \"password123\"}'"
+    },
+    "login": {
+      "description": "用户登录",
+      "command": "curl -X POST http://localhost:8000/api/auth/login -H 'Content-Type: application/x-www-form-urlencoded' -d 'username=testuser&password=password123'"
+    },
+    "get_kline": {
+      "description": "获取K线数据",
+      "command": "curl -X GET 'http://localhost:8000/api/kline/data?symbol=BTCUSDT&timeframe=1h' -H 'Authorization: Bearer YOUR_TOKEN'"
+    }
+  },
+  "python_examples": {
+    "basic_usage": {
+      "description": "Python基本使用示例",
+      "code": "import requests\n\n# 登录\nresponse = requests.post('http://localhost:8000/api/auth/login', data={'username': 'testuser', 'password': 'password123'})\ntoken = response.json()['access_token']\n\n# 获取K线数据\nheaders = {'Authorization': f'Bearer {token}'}\nresponse = requests.get('http://localhost:8000/api/kline/data', params={'symbol': 'BTCUSDT', 'timeframe': '1h'}, headers=headers)\nkline_data = response.json()\nprint(kline_data)"
+    }
+  },
+  "javascript_examples": {
+    "basic_usage": {
+      "description": "JavaScript基本使用示例",
+      "code": "class TradingAPI {\n    constructor(baseURL = 'http://localhost:8000') {\n        this.baseURL = baseURL;\n        this.token = null;\n    }\n\n    async login(username, password) {\n        const response = await fetch(`${this.baseURL}/api/auth/login`, {\n            method: 'POST',\n            headers: {'Content-Type': 'application/x-www-form-urlencoded'},\n            body: `username=${username}&password=${password}`\n        });\n        const result = await response.json();\n        this.token = result.access_token;\n        return result;\n    }\n\n    async getKlineData(symbol, timeframe) {\n        const response = await fetch(`${this.baseURL}/api/kline/data?symbol=${symbol}&timeframe=${timeframe}`, {\n            headers: {'Authorization': `Bearer ${this.token}`}\n        });\n        return await response.json();\n    }\n}\n\n// 使用示例\nconst api = new TradingAPI();\napi.login('testuser', 'password123').then(() => {\n    return api.getKlineData('BTCUSDT', '1h');\n}).then(data => {\n    console.log('K线数据:', data);\n});"
+    }
+  }
+}

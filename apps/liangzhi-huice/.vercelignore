@@ -1,0 +1,108 @@
+# 依赖和构建文件
+node_modules/
+build/
+dist/
+.git/
+.trae/
+*.log
+logs/
+
+# Git LFS 对象
+.git/lfs/
+.git/objects/
+
+# Yoyo 快照文件
+.yoyo/
+*.obj
+
+# 大型数据文件
+*.h5
+*.csv
+*.pkl
+ETHUSDT_*
+*.dll
+*.pyd
+*.so
+*.dylib
+*.exe
+
+# 缓存目录
+cache/
+K线data/
+.cache/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# 虚拟环境
+.venv/
+venv/
+env/
+
+# 备份文件
+backup_deleted_files/
+
+# Python相关
+*.py
+*.pyc
+*.pyo
+*.pyd
+__pycache__/
+.pytest_cache/
+.coverage
+.env
+
+# Docker相关
+Dockerfile
+docker-compose*.yml
+
+# 数据库相关
+database/
+*.sql
+
+# 测试文件
+tests/
+test_*.py
+*_test.py
+
+# 文档和配置
+docs/
+*.md
+requirements.txt
+setup_*.md
+
+# 开发工具
+nodemon.json
+.ai_memory/
+
+# 临时文件
+*.tmp
+*.temp
+*.log
+
+# JavaScript 映射文件
+*.js.map
+*.css.map
+
+# 大型包文件
+*.pack
+*.bundle
+
+# IDE文件
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# 系统文件
+.DS_Store
+Thumbs.db
+
+# OpenAPI文档
+openapi*.json
+api_examples.json
+
+# 批处理文件
+*.bat
+*.sh

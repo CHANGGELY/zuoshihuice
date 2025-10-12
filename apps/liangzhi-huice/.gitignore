@@ -1,0 +1,77 @@
+
+# YoYo AI version control directory
+.yoyo/
+
+# 依赖文件
+node_modules/
+*/node_modules/
+**/node_modules/
+
+# Python缓存
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.so
+.venv/
+venv/
+env/
+
+# 环境变量
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# 日志文件
+*.log
+logs/
+
+# 数据库
+*.db
+*.sqlite3
+db.sqlite3
+
+# 缓存文件 - 大文件由LFS管理，只忽略小的临时缓存
+.cache/
+# cache/ 目录不再忽略，因为*.pkl文件由LFS管理
+# *.pkl 不再忽略，因为由LFS管理
+
+# IDE文件
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# 操作系统文件
+.DS_Store
+Thumbs.db
+
+# 构建输出
+dist/
+build/
+*.tgz
+*.tar.gz
+
+# 临时文件
+tmp/
+temp/
+*.tmp
+
+# 图片输出文件（保留示例）
+equity_curve_*.png
+!equity_curve_example.png
+
+# =====================================================================================
+# Git LFS管理的大文件 - 不需要忽略
+# =====================================================================================
+# 以下文件类型由Git LFS管理：
+# - *.h5 (K线数据文件)
+# - *.pkl (缓存文件)
+# - *.hdf5 (HDF5数据文件)
+
+# 临时生成的小文件仍然忽略
+*.tmp
+*.temp

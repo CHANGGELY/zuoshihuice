@@ -1,0 +1,38 @@
+# Global dependency directories
+node_modules/
+*/node_modules/
+
+# Python virtual environments and caches
+.venv/
+venv/
+env/
+*/.venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Environment files
+.env
+.env.*
+apps/*/.env
+services/backtest-engine/.env
+
+# Build artifacts and logs
+dist/
+build/
+*.log
+logs/
+.cache/
+.pytest_cache/
+.nyc_output/
+
+# Temporary files
+*.tmp
+*.temp
+tmp/
+temp/
+
+# OS generated files
+.DS_Store
+Thumbs.db

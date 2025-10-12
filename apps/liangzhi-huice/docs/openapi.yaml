@@ -1,0 +1,94 @@
+components:
+  securitySchemes:
+    bearerAuth:
+      bearerFormat: JWT
+      scheme: bearer
+      type: http
+info:
+  contact:
+    email: support@example.com
+    name: API支持
+  description: 基于FastAPI + TimescaleDB的高性能量化交易系统
+  title: 量化交易系统API
+  version: 1.0.0
+openapi: 3.0.0
+paths:
+  /api/auth/register:
+    post:
+      requestBody:
+        content:
+          application/json:
+            schema:
+              properties:
+                email:
+                  type: string
+                password:
+                  type: string
+                username:
+                  type: string
+              required:
+              - username
+              - email
+              - password
+              type: object
+        required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                properties:
+                  message:
+                    type: string
+                  user_id:
+                    type: integer
+                type: object
+          description: 注册成功
+      summary: 用户注册
+      tags:
+      - 认证
+  /api/kline/data:
+    get:
+      parameters:
+      - description: 交易对符号
+        in: query
+        name: symbol
+        required: true
+        schema:
+          type: string
+      - description: 时间周期
+        in: query
+        name: timeframe
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                items:
+                  properties:
+                    close:
+                      type: number
+                    high:
+                      type: number
+                    low:
+                      type: number
+                    open:
+                      type: number
+                    timestamp:
+                      type: string
+                    volume:
+                      type: number
+                  type: object
+                type: array
+          description: K线数据
+      security:
+      - bearerAuth: []
+      summary: 获取K线数据
+      tags:
+      - K线数据
+servers:
+- description: 开发环境
+  url: http://localhost:8000
