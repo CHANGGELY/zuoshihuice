@@ -1,69 +1,4 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-"""
-前端服务器
-提供完整的Web前端界面
-"""
-
-import json
-import os
-from pathlib import Path
-from http.server import HTTPServer, BaseHTTPRequestHandler
-from urllib.parse import urlparse
-import logging
-
-# 配置日志
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
-logger = logging.getLogger(__name__)
-
-class FrontendHandler(BaseHTTPRequestHandler):
-    """前端处理器"""
-    
-    def do_GET(self):
-        """处理GET请求"""
-        try:
-            parsed_url = urlparse(self.path)
-            path = parsed_url.path
-            
-            if path == '/' or path == '/index.html':
-                self.serve_main_page()
-            elif path == '/api/test':
-                self.serve_api_test()
-            else:
-                self.send_error(404, "页面不存在")
-                
-        except Exception as e:
-            logger.error(f"处理GET请求失败: {e}")
-            self.send_error(500, str(e))
-    
-    def serve_main_page(self):
-        """提供主页面"""
-        html_content = self.get_main_html()
-        
-        self.send_response(200)
-        self.send_header('Content-Type', 'text/html; charset=utf-8')
-        self.send_header('Cache-Control', 'no-cache')
-        self.end_headers()
-        
-        self.wfile.write(html_content.encode('utf-8'))
-    
-    def serve_api_test(self):
-        """API测试接口"""
-        response = {
-            "status": "success",
-            "message": "前端服务器运行正常",
-            "backend_url": os.environ.get('BACKEND_URL', 'http://localhost:8000')
-        }
-        
-        self.send_response(200)
-        self.send_header('Content-Type', 'application/json; charset=utf-8')
-        self.end_headers()
-        
-        self.wfile.write(json.dumps(response, ensure_ascii=False).encode('utf-8'))
-    
-    def get_main_html(self):
-        """获取主页面HTML"""
-        return '''<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
@@ -440,7 +375,7 @@ class FrontendHandler(BaseHTTPRequestHandler):
     <div class="container">
         <div class="header">
             <h1>📊 永续合约K线回测系统</h1>
-            <p>专业Web版量化交易回测平台 | 前端端口: 3000 | 后端端口: 8001</p>
+            <p>专业Web版量化交易回测平台 | 前端端口: 8000 | 后端端口: 8000</p>
         </div>
         
         <div class="content">
@@ -478,7 +413,6 @@ class FrontendHandler(BaseHTTPRequestHandler):
                         <label>卖单价差</label>
                         <input type="number" id="askSpread" value="0.002" step="0.0001" title="卖单价差比例">
                     </div>
-                    <!-- 仓位比例已改为自动计算 (1/当前杠杆)，不再需要手动设置 -->
                     <div class="form-group">
                         <label>最大仓位比例</label>
                         <input type="number" id="maxPositionRatio" value="0.8" step="0.01" title="最大仓位价值不超过权益的比例">
@@ -609,7 +543,7 @@ class FrontendHandler(BaseHTTPRequestHandler):
         let currentKlineData = null;
         let progressInterval = null;
         let tradeMarkers = []; // 存储交易标记
-        const BACKEND_URL = 'http://localhost:8001';
+        const BACKEND_URL = '';
         
         // 初始化
         document.addEventListener('DOMContentLoaded', function() {
@@ -724,7 +658,7 @@ class FrontendHandler(BaseHTTPRequestHandler):
                             style: 1,
                         },
                         horzLines: {
-                            color: '#2a2a2a',
+                            color: '#2a2aa',
                             style: 1,
                         },
                     },
@@ -1094,7 +1028,7 @@ class FrontendHandler(BaseHTTPRequestHandler):
                 status.classList.add('hidden');
                 updateProgress(0, "准备回测参数...");
 
-                // 收集参数 - 与backtest_kline_trajectory.py保持一致
+                // 收集参数
                 const params = {
                     symbol: document.getElementById('symbol').value,
                     startDate: document.getElementById('startDate').value,
@@ -1102,21 +1036,17 @@ class FrontendHandler(BaseHTTPRequestHandler):
                     initialCapital: parseFloat(document.getElementById('initialCapital').value),
                     leverage: parseInt(document.getElementById('leverage').value),
 
-                    // 🎯 新增参数，与backtest_kline_trajectory.py一致
                     bidSpread: parseFloat(document.getElementById('bidSpread').value),
                     askSpread: parseFloat(document.getElementById('askSpread').value),
-                    // positionSizeRatio: 自动计算 = 1/当前杠杆，不再从前端传递
                     maxPositionRatio: parseFloat(document.getElementById('maxPositionRatio').value),
                     orderRefreshTime: parseFloat(document.getElementById('orderRefreshTime').value),
                     useDynamicOrderSize: document.getElementById('useDynamicOrderSize').checked,
 
-                    // 🎯 手续费和返佣参数（前端可调）
                     makerFee: parseFloat(document.getElementById('makerFee').value),
                     takerFee: parseFloat(document.getElementById('takerFee').value),
                     useFeeRebate: document.getElementById('useFeeRebate').checked,
                     rebateRate: parseFloat(document.getElementById('rebateRate').value),
 
-                    // 固定参数（与backtest_kline_trajectory.py保持一致）
                     positionMode: "Hedge",
                     minOrderAmount: 0.008,
                     maxOrderAmount: 99.0,
@@ -1313,33 +1243,4 @@ class FrontendHandler(BaseHTTPRequestHandler):
         }
     </script>
 </body>
-</html>'''
-    
-    def log_message(self, format, *args):
-        """重写日志方法，使用标准日志"""
-        logger.info(f"{self.address_string()} - {format % args}")
-
-def main():
-    """主函数"""
-    port = 3000
-    server = HTTPServer(('localhost', port), FrontendHandler)
-    
-    print("=" * 60)
-    print("🌐 永续合约K线回测系统 - 前端服务器启动成功!")
-    print("=" * 60)
-    print(f"📱 前端地址: http://localhost:{port}")
-    print(f"🔗 主页面: http://localhost:{port}/")
-    print(f"🔧 API测试: http://localhost:{port}/api/test")
-    print(f"🔌 后端服务器: {os.environ.get('BACKEND_URL', 'http://localhost:8000')}")
-    print("=" * 60)
-    print("按 Ctrl+C 停止服务器")
-    print()
-    
-    try:
-        server.serve_forever()
-    except KeyboardInterrupt:
-        print("\n🛑 前端服务器已停止")
-        server.shutdown()
-
-if __name__ == "__main__":
-    main()
+</html>

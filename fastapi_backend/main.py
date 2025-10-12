@@ -10,6 +10,9 @@ import sys
 import asyncio
 import uvicorn
 from pathlib import Path
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
+from .settings import settings
 
 # Models
 class Kline(BaseModel):
@@ -66,6 +69,20 @@ class ProgressResponse(BaseModel):
 
 app = FastAPI(title="Backtest API", version="0.1.0")
 
+# 静态资源目录与首页
+STATIC_DIR = Path(__file__).parent / "static"
+try:
+    app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
+except Exception:
+    pass
+
+@app.get("/")
+def index():
+    index_file = STATIC_DIR / "index.html"
+    if index_file.exists():
+        return FileResponse(index_file)
+    return JSONResponse({"status": "ok", "message": "index.html not found"})
+
 # 存储运行中的回测任务
 running_backtest_task: Optional[asyncio.Task] = None
 
@@ -77,7 +94,7 @@ def health():
 def get_progress():
     """获取回测进度"""
     try:
-        progress_file = Path("progress.json")
+        progress_file = settings.CACHE_DIR / "progress.json"
         if progress_file.exists():
             with open(progress_file, 'r', encoding='utf-8') as f:
                 progress_data = json.load(f)
@@ -94,23 +111,30 @@ def get_progress():
 def get_klines(symbol: str, start_date: str, end_date: str, timeframe: Literal['1m','1h','1d','1M'] = '1m'):
     try:
         # 调用现有后端脚本逻辑（直接复用文件结构与缓存格式）
-        from 后端回测服务器 import UnifiedBacktestHandler
         import types
         import pandas as pd
 
-        handler = UnifiedBacktestHandler
         # 直接复用其静态方法能力：构造query_params字典后调用其处理逻辑中的核心代码
         # 为隔离副作用，这里复制核心过滤与重采样流程（未来会重构为data模块公用函数）
         from pathlib import Path
         import pickle
 
-        data_file = Path("K线data") / "ETHUSDT_1m_2019-11-01_to_2025-06-15.h5"
-        cache_dir = Path("K线data")
+        # 动态发现数据文件（匹配 {symbol}_1m_*.h5），找不到则回退到默认样例
+        data_dir = settings.DATA_DIR
+        candidates = list(data_dir.glob(f"{symbol}_1m_*.h5"))
+        if candidates:
+            data_file = candidates[0]
+        else:
+            data_file = data_dir / "ETHUSDT_1m_2019-11-01_to_2025-06-15.h5"
+
+        # 缓存目录移动到 CACHE_DIR，按 symbol/timeframe 组织
+        cache_dir = settings.CACHE_DIR / "klines" / symbol
+        cache_dir.mkdir(parents=True, exist_ok=True)
         timeframe_cache = {
-            '1m': 'ETHUSDT_1m_processed.pkl',
-            '1h': 'ETHUSDT_1h_processed.pkl',
-            '1d': 'ETHUSDT_1d_processed.pkl',
-            '1M': 'ETHUSDT_1M_processed.pkl'
+            '1m': f'{symbol}_1m_processed.pkl',
+            '1h': f'{symbol}_1h_processed.pkl',
+            '1d': f'{symbol}_1d_processed.pkl',
+            '1M': f'{symbol}_1M_processed.pkl'
         }
 
         # 先尝试缓存
@@ -230,7 +254,7 @@ async def run_backtest(params: BacktestParams, background_tasks: BackgroundTasks
         params_file = f.name
     
     # 初始化进度文件
-    progress_file = Path("progress.json")
+    progress_file = settings.CACHE_DIR / "progress.json"
     with open(progress_file, 'w', encoding='utf-8') as f:
         json.dump({'progress': 0, 'message': '准备回测参数...'}, f, ensure_ascii=False)
     
@@ -289,7 +313,7 @@ async def _execute_backtest_subprocess(params_file: str, background_tasks: Backg
             }
         
         # 更新最终进度
-        progress_file = Path("progress.json")
+        progress_file = settings.CACHE_DIR / "progress.json"
         with open(progress_file, 'w', encoding='utf-8') as f:
             json.dump(progress_data, f, ensure_ascii=False, indent=2)
             
@@ -300,7 +324,7 @@ async def _execute_backtest_subprocess(params_file: str, background_tasks: Backg
             'message': f'执行回测时发生错误: {str(e)}',
             'error': str(e)
         }
-        progress_file = Path("progress.json")
+        progress_file = settings.CACHE_DIR / "progress.json"
         with open(progress_file, 'w', encoding='utf-8') as f:
             json.dump(progress_data, f, ensure_ascii=False, indent=2)
     finally:
@@ -333,8 +357,8 @@ async def _monitor_progress(stderr):
                             'progress': percentage,
                             'message': status
                         }
-                        progress_file = Path("progress.json")
-                        with open(progress_file, 'w', encoding='utf-8') as f:
+        progress_file = settings.CACHE_DIR / "progress.json"
+        with open(progress_file, 'w', encoding='utf-8') as f:
                             json.dump(progress_data, f, ensure_ascii=False, indent=2)
                             
                     except (ValueError, IndexError):

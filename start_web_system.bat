@@ -1,76 +1,64 @@
 @echo off
 chcp 65001 >nul
-title Web Trading Backtest System
+setlocal ENABLEDELAYEDEXPANSION
+
+title Web Trading Backtest System (FastAPI 8000)
 
 echo.
 echo ========================================
 echo    Web Trading Backtest System
-echo    Starting Frontend and Backend...
+echo    FastAPI backend + static frontend on 8000
 echo ========================================
 echo.
 
-:: Check Python
+:: Proxy (use local HTTP proxy)
+set HTTP_PROXY=http://127.0.0.1:10808
+set HTTPS_PROXY=%HTTP_PROXY%
+set NO_PROXY=localhost,127.0.0.1
+
+:: Python check
 python --version >nul 2>&1
 if errorlevel 1 (
     echo ERROR: Python not found
-    echo Please install Python 3.8+ and add to PATH
+    echo Please install Python 3.11+ and add to PATH
     pause
     exit /b 1
 )
 
-:: Check data file
-if not exist "K线data\ETHUSDT_1m_2019-11-01_to_2025-06-15.h5" (
-    echo ERROR: Data file not found
-    echo Please ensure file exists: K线data\ETHUSDT_1m_2019-11-01_to_2025-06-15.h5
-    pause
-    exit /b 1
+:: Data dir check
+if not exist "K线data" (
+    echo Creating data directory: K线data
+    mkdir "K线data"
 )
 
-:: Check FastAPI backend
-if not exist "fastapi_backend\main.py" (
-    echo ERROR: FastAPI backend not found
-    echo Please ensure file exists: fastapi_backend\main.py
-    pause
-    exit /b 1
+:: Cache dir check
+if not exist "cache" (
+    echo Creating cache directory: cache
+    mkdir "cache"
 )
 
-:: Check frontend server
-if not exist "前端服务器.py" (
-    echo ERROR: Frontend server not found
-    echo Please ensure file exists: 前端服务器.py
-    pause
-    exit /b 1
+:: Activate venv if exists
+if exist ".venv\Scripts\activate.bat" (
+  call .venv\Scripts\activate.bat
 )
 
-echo Environment check passed
-echo.
-
-:: Start FastAPI backend server (port 8000)
+:: Start FastAPI backend (serves static index on /)
 echo Starting FastAPI backend server (port 8000)...
 start "FastAPI Backend" cmd /k "python -m uvicorn fastapi_backend.main:app --host 0.0.0.0 --port 8000 --reload"
 
-:: Wait for backend to start
+:: Give server a moment
 timeout /t 3 /nobreak >nul
 
-:: Start frontend server (port 3000)
-echo Starting frontend server (port 3000)...
-start "Frontend Server" cmd /k "python -X utf8 前端服务器.py"
-
-:: Wait for frontend to start
-timeout /t 3 /nobreak >nul
-
-:: Open browser
-echo Opening web interface...
-start "" "http://localhost:3000"
+:: Open browser to backend root (static frontend)
+start "" "http://localhost:8000"
 
 echo.
 echo ========================================
 echo    System Started Successfully!
 echo ========================================
 echo.
-echo Frontend: http://localhost:3000
-echo Backend:  http://localhost:8000 (FastAPI)
-echo.
-echo To stop: Close all command windows
-echo.
-pause
+echo UI:  http://localhost:8000
+
+echo Press any key to exit launcher...
+pause >nul
+endlocal
