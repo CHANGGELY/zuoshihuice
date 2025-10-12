@@ -1,0 +1,8 @@
+-c requirements.txt
+black
+ruff
+mypy
+pytest
+pytest-asyncio
+pre-commit
+pip-tools

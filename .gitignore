@@ -72,3 +72,9 @@ equity_curve_*.png
 # 临时生成的小文件仍然忽略
 *.tmp
 *.temp
+
+# === 本地开发与运行时目录（不提交） ===
+.venv/
+.pytest_cache/
+cache/
+.env

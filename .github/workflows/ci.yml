@@ -1,0 +1,37 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  build-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install pip-tools and deps
+        run: |
+          python -m pip install -U pip setuptools wheel pip-tools
+          pip-compile --resolver=backtracking requirements.in -o requirements.txt
+          pip-compile --resolver=backtracking requirements-dev.in -o requirements-dev.txt
+          pip install -r requirements-dev.txt
+
+      - name: Lint and type check
+        run: |
+          ruff check --fix .
+          black --check .
+          mypy .
+
+      - name: Tests
+        run: |
+          pytest -q
+
+      - name: Build Docker (optional)
+        if: github.event_name == 'push'
+        run: |
+          docker build -t kline-backtest:ci .

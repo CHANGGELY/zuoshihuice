@@ -1,0 +1,11 @@
+fastapi
+uvicorn[standard]
+pandas
+numpy
+h5py
+pydantic
+pydantic-settings
+aiofiles
+orjson
+tqdm
+matplotlib
