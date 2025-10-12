@@ -26,10 +26,10 @@ if not exist "K线data\ETHUSDT_1m_2019-11-01_to_2025-06-15.h5" (
     exit /b 1
 )
 
-:: Check backend server
-if not exist "后端回测服务器.py" (
-    echo ERROR: Backend server not found
-    echo Please ensure file exists: 后端回测服务器.py
+:: Check FastAPI backend
+if not exist "fastapi_backend\main.py" (
+    echo ERROR: FastAPI backend not found
+    echo Please ensure file exists: fastapi_backend\main.py
     pause
     exit /b 1
 )
@@ -45,9 +45,9 @@ if not exist "前端服务器.py" (
 echo Environment check passed
 echo.
 
-:: Start backend server (port 8001)
-echo Starting backend server (port 8001)...
-start "Backend Server" cmd /k "python -X utf8 后端回测服务器.py"
+:: Start FastAPI backend server (port 8000)
+echo Starting FastAPI backend server (port 8000)...
+start "FastAPI Backend" cmd /k "python -m uvicorn fastapi_backend.main:app --host 0.0.0.0 --port 8000 --reload"
 
 :: Wait for backend to start
 timeout /t 3 /nobreak >nul
@@ -69,7 +69,7 @@ echo    System Started Successfully!
 echo ========================================
 echo.
 echo Frontend: http://localhost:3000
-echo Backend:  http://localhost:8001
+echo Backend:  http://localhost:8000 (FastAPI)
 echo.
 echo To stop: Close all command windows
 echo.

@@ -1,0 +1,37 @@
+# Core Framework
+fastapi>=0.104.1
+uvicorn[standard]>=0.24.0
+pydantic>=2.5.0
+pydantic-settings>=2.1.0
+
+# Data Processing (Modern Stack)
+polars>=0.20.0
+pyarrow>=14.0.0
+pandas>=2.1.0  # Gradual migration
+numpy>=1.24.0
+
+# Async & Performance
+aiofiles>=23.2.1
+asyncio-mqtt>=0.13.0
+
+# HTTP & WebSocket
+httpx>=0.25.0
+websockets>=12.0
+
+# Testing & Quality
+pytest>=7.4.0
+pytest-asyncio>=0.21.0
+pytest-cov>=4.1.0
+ruff>=0.1.6
+black>=23.11.0
+mypy>=1.7.0
+
+# Monitoring & Logging
+structlog>=23.2.0
+rich>=13.7.0
+
+# Optional: High-performance computing
+numba>=0.58.0
+
+# Development
+pre-commit>=3.6.0

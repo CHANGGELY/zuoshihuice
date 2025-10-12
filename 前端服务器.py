@@ -52,7 +52,7 @@ class FrontendHandler(BaseHTTPRequestHandler):
         response = {
             "status": "success",
             "message": "前端服务器运行正常",
-            "backend_url": "http://localhost:8001"
+            "backend_url": os.environ.get('BACKEND_URL', 'http://localhost:8000')
         }
         
         self.send_response(200)
@@ -1330,7 +1330,7 @@ def main():
     print(f"📱 前端地址: http://localhost:{port}")
     print(f"🔗 主页面: http://localhost:{port}/")
     print(f"🔧 API测试: http://localhost:{port}/api/test")
-    print(f"🔌 后端服务器: http://localhost:8001")
+    print(f"🔌 后端服务器: {os.environ.get('BACKEND_URL', 'http://localhost:8000')}")
     print("=" * 60)
     print("按 Ctrl+C 停止服务器")
     print()
