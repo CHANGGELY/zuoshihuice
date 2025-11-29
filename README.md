@@ -9,6 +9,7 @@
 [![Issues](https://img.shields.io/github/issues/CHANGGELY/liangzhi-backtest)](https://github.com/CHANGGELY/liangzhi-backtest/issues)
 [![Last Commit](https://img.shields.io/github/last-commit/CHANGGELY/liangzhi-backtest)](https://github.com/CHANGGELY/liangzhi-backtest/commits/master)
 [![CI](https://github.com/CHANGGELY/liangzhi-backtest/actions/workflows/ci.yml/badge.svg)](https://github.com/CHANGGELY/liangzhi-backtest/actions/workflows/ci.yml)
+[![Coverage](https://codecov.io/gh/CHANGGELY/liangzhi-backtest/branch/master/graph/badge.svg)](https://codecov.io/gh/CHANGGELY/liangzhi-backtest)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
 一个面向永续合约做市与网格类策略的专业回测平台，融合 React + Vite 前端、Node.js API 与 Python 回测引擎，支持 ATR 自适应网格策略，强调数据完整性与可视化分析体验。
@@ -57,6 +58,12 @@ Liangzhi Backtest Platform is a professional backtesting system for perpetual ma
 
 <p align="center">
   <img src="services/backtest-engine/equity_curve_20250811_145017_Lev125_Spread0.004.png" alt="Equity Curve" width="720">
+</p>
+
+### 前端 K 线信号（真实数据与交互）
+
+<p align="center">
+  <img src="docs/kline-signal-2025-11-29T20-49-02-811Z.png" alt="Kline Signal" width="720">
 </p>
 
 
