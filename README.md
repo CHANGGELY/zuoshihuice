@@ -8,6 +8,7 @@
 [![Forks](https://img.shields.io/github/forks/CHANGGELY/zuoshihuice?style=social)](https://github.com/CHANGGELY/zuoshihuice/forks)
 [![Issues](https://img.shields.io/github/issues/CHANGGELY/zuoshihuice)](https://github.com/CHANGGELY/zuoshihuice/issues)
 [![Last Commit](https://img.shields.io/github/last-commit/CHANGGELY/zuoshihuice)](https://github.com/CHANGGELY/zuoshihuice/commits/master)
+[![CI](https://github.com/CHANGGELY/zuoshihuice/actions/workflows/ci.yml/badge.svg)](https://github.com/CHANGGELY/zuoshihuice/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
 一个面向永续合约做市与网格类策略的专业回测平台，融合 React + Vite 前端、Node.js API 与 Python 回测引擎，支持 ATR 自适应网格策略，强调数据完整性与可视化分析体验。
@@ -49,6 +50,15 @@ Liangzhi Backtest Platform is a professional backtesting system for perpetual ma
 - 启动回测引擎：
   - `cd services/backtest-engine`
   - `python -X utf8 backtest_kline_trajectory.py`
+
+## 预览截图
+
+### 权益曲线（来自真实回测结果）
+
+<p align="center">
+  <img src="services/backtest-engine/equity_curve_20250811_145017_Lev125_Spread0.004.png" alt="Equity Curve" width="720">
+</p>
+
 
 ## 许可协议
 本项目采用 MIT 许可证，详情见 [`LICENSE`](LICENSE)。
