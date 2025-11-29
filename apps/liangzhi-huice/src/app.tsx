@@ -35,21 +35,32 @@ const App: React.FC = () => {
     };
   }, [setWindowSize]);
 
+  // 同步主题到 body
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', currentTheme);
+  }, [currentTheme]);
+
   // Ant Design主题配置
   const antdTheme = {
     algorithm: currentTheme === 'dark' ? theme.darkAlgorithm : theme.defaultAlgorithm,
     token: {
-      colorPrimary: '#1890ff',
-      borderRadius: 6,
+      colorPrimary: '#4D7CFF', // Matches --color-primary hue 225
+      borderRadius: 8,
       wireframe: false,
+      fontFamily: "'Outfit', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
     },
     components: {
       Layout: {
-        headerBg: currentTheme === 'dark' ? '#001529' : '#ffffff',
-        siderBg: currentTheme === 'dark' ? '#001529' : '#ffffff',
+        headerBg: 'transparent',
+        bodyBg: 'transparent',
+        siderBg: 'transparent',
       },
       Menu: {
         itemBg: 'transparent',
+        activeBarBorderWidth: 0,
+      },
+      Card: {
+        colorBgContainer: 'transparent',
       },
     },
   };
@@ -61,7 +72,7 @@ const App: React.FC = () => {
         locale={language === 'zh-CN' ? zhCN : undefined}
       >
         <AntdApp>
-          <div className="app" data-theme={currentTheme}>
+          <div className="app">
             <RouterProvider router={router} />
             
             {/* 全局通知组件 */}

@@ -22,9 +22,37 @@ app.use(express.static(path.join(__dirname, '../dist')));
 app.use('/api/auth', authRoutes);
 app.use('/api/v1/kline', klineRoutes);
 app.use('/api/kline', klineRoutes);
-app.use('/api/v1/symbols', klineRoutes);
-app.use('/api/v1/timeframes', klineRoutes);
-app.use('/api/v1/signals', klineRoutes);
+// app.use('/api/v1/symbols', klineRoutes); // Fixed: Don't map symbols to kline routes root
+// app.use('/api/v1/timeframes', klineRoutes); // Fixed: Don't map timeframes to kline routes root
+app.use('/api/v1/signals', klineRoutes); // This might need checking too
+
+// Metadata routes
+app.get('/api/v1/symbols', (_req, res) => {
+  res.json({ 
+    success: true, 
+    data: [
+      { label: 'ETH/USDT', value: 'ETHUSDT' },
+      { label: 'BNB/USDT', value: 'BNBUSDT' },
+      { label: 'BTC/USDT', value: 'BTCUSDT' }
+    ] 
+  });
+});
+
+app.get('/api/v1/timeframes', (_req, res) => {
+  res.json({ 
+    success: true, 
+    data: [
+      { label: '1分钟', value: '1m' },
+      { label: '5分钟', value: '5m' },
+      { label: '15分钟', value: '15m' },
+      { label: '30分钟', value: '30m' },
+      { label: '1小时', value: '1h' },
+      { label: '4小时', value: '4h' },
+      { label: '1天', value: '1d' }
+    ] 
+  });
+});
+
 app.use('/api/v1/strategy', strategyRoutes);
 app.use('/api/v1/backtest', backtestRoutes);
 

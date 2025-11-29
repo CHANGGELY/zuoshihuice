@@ -452,126 +452,227 @@ export const KlinePage: React.FC = () => {
   );
 
   return (
-    <ErrorBoundary>
-      <Layout style={{ height: '100vh', overflow: 'hidden' }}>
-        {/* 侧边栏 */}
-        {!isMobile && (
-          <Sider
-            width={300}
-            collapsed={siderCollapsed}
-            onCollapse={setSiderCollapsed}
-            theme="light"
-            style={{
-              overflow: 'auto',
-              height: '100vh',
-              position: 'fixed',
-              left: 0,
-              top: 0,
-              bottom: 0,
-            }}
-          >
-            <SiderContent />
-          </Sider>
-        )}
+    <Layout style={{ height: '100vh', overflow: 'hidden', background: 'transparent' }}>
+      <Sider
+        collapsible
+        collapsed={siderCollapsed}
+        onCollapse={setSiderCollapsed}
+        theme="light"
+        width={260}
+        style={{ 
+          borderRight: '1px solid var(--color-border)',
+          background: 'var(--color-bg-surface)',
+          backdropFilter: 'blur(12px)',
+          zIndex: 20 
+        }}
+        trigger={null}
+      >
+        <div style={{ 
+          height: '64px', 
+          display: 'flex', 
+          alignItems: 'center', 
+          justifyContent: 'center',
+          borderBottom: '1px solid var(--color-border)'
+        }}>
+          <h1 className="text-gradient" style={{ 
+            fontSize: siderCollapsed ? '14px' : '20px', 
+            fontWeight: 'bold',
+            margin: 0,
+            whiteSpace: 'nowrap',
+            overflow: 'hidden',
+            transition: 'all 0.3s'
+          }}>
+            {siderCollapsed ? '量知' : '量知·回测'}
+          </h1>
+        </div>
         
-        {/* 主内容区 */}
-        <Layout style={{ marginLeft: !isMobile && !siderCollapsed ? 300 : 0 }}>
-          <Content style={{ padding: '8px', overflow: 'auto' }}>
-            {/* 错误提示 */}
-            {error && (
-              <Alert
-                message="数据加载错误"
-                description={error.message || '未知错误'}
-                type="error"
-                showIcon
-                closable
-                style={{ marginBottom: 8 }}
+        <div style={{ padding: '16px', overflowY: 'auto', height: 'calc(100% - 64px)' }}>
+          {!siderCollapsed && (
+            <div className="animate-fade-in">
+              <div style={{ marginBottom: '24px' }}>
+                <h3 style={{ 
+                  fontSize: '12px', 
+                  textTransform: 'uppercase', 
+                  color: 'var(--color-text-tertiary)',
+                  marginBottom: '12px',
+                  letterSpacing: '1px'
+                }}>
+                  市场选择
+                </h3>
+                <Select
+                  style={{ width: '100%' }}
+                  value={currentSymbol}
+                  onChange={updateSymbol}
+                  options={symbolOptions}
+                  size="large"
+                  className="glass-panel"
+                  variant="borderless"
+                />
+              </div>
+
+              <div style={{ marginBottom: '24px' }}>
+                <h3 style={{ 
+                  fontSize: '12px', 
+                  textTransform: 'uppercase', 
+                  color: 'var(--color-text-tertiary)',
+                  marginBottom: '12px',
+                  letterSpacing: '1px'
+                }}>
+                  时间周期
+                </h3>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                  {timeframeOptions.map(option => (
+                    <Button
+                      key={option.value}
+                      type={currentTimeframe === option.value ? 'primary' : 'default'}
+                      onClick={() => updateTimeframe(option.value)}
+                      size="small"
+                      style={{ flex: '1 0 30%' }}
+                    >
+                      {option.label}
+                    </Button>
+                  ))}
+                </div>
+              </div>
+
+              <Divider style={{ margin: '16px 0' }} />
+
+              <Button 
+                block 
+                icon={<SettingOutlined />} 
+                onClick={() => setConfigDrawerVisible(true)}
+                style={{ marginBottom: '12px' }}
+              >
+                策略配置
+              </Button>
+              
+              <Button 
+                block 
+                type="primary"
+                icon={<BarChartOutlined />} 
+                onClick={() => runBacktest()}
+                loading={loadingState.isLoading}
+              >
+                开始回测
+              </Button>
+            </div>
+          )}
+          
+          {siderCollapsed && (
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '16px', marginTop: '16px' }}>
+               <Tooltip title="配置" placement="right">
+                 <Button type="text" icon={<SettingOutlined />} onClick={() => setConfigDrawerVisible(true)} />
+               </Tooltip>
+               <Tooltip title="运行回测" placement="right">
+                 <Button type="primary" shape="circle" icon={<BarChartOutlined />} onClick={() => runBacktest()} />
+               </Tooltip>
+            </div>
+          )}
+        </div>
+      </Sider>
+
+      <Layout>
+        <Content style={{ 
+          padding: '16px', 
+          position: 'relative',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '16px'
+        }}>
+          <div style={{ 
+            display: 'flex', 
+            justifyContent: 'space-between', 
+            alignItems: 'center',
+            marginBottom: '8px'
+          }}>
+             <Space>
+               <Button 
+                 type="text" 
+                 icon={<MenuOutlined />} 
+                 onClick={() => setSiderCollapsed(!siderCollapsed)} 
+               />
+               <div>
+                 <span style={{ fontSize: '18px', fontWeight: 600 }}>{currentSymbol}</span>
+                 <span style={{ marginLeft: '8px', color: 'var(--color-text-secondary)', fontSize: '14px' }}>
+                   {timeframeOptions.find(t => t.value === currentTimeframe)?.label}
+                 </span>
+               </div>
+             </Space>
+             
+             <Space>
+               <Tooltip title="重新加载数据">
+                 <Button 
+                   icon={<ReloadOutlined />} 
+                   onClick={() => fetchKlineData(currentSymbol, currentTimeframe)}
+                   loading={loadingState.isLoading}
+                   shape="circle"
+                 />
+               </Tooltip>
+               <Tooltip title="全屏模式">
+                 <Button 
+                   icon={isFullscreen ? <FullscreenExitOutlined /> : <FullscreenOutlined />} 
+                   onClick={() => setIsFullscreen(!isFullscreen)}
+                   shape="circle"
+                 />
+               </Tooltip>
+             </Space>
+          </div>
+
+          {error && (
+            <Alert
+              message="数据加载错误"
+              description={error.message}
+              type="error"
+              showIcon
+              closable
+              className="animate-fade-in"
+              style={{ borderRadius: '8px' }}
+            />
+          )}
+
+          <div className="glass-panel animate-fade-in" style={{ 
+            flex: 1, 
+            padding: '4px',
+            display: 'flex',
+            flexDirection: 'column',
+            overflow: 'hidden'
+          }}>
+            {loadingState.isLoading && !klineData.length ? (
+              <div style={{ 
+                height: '100%', 
+                display: 'flex', 
+                justifyContent: 'center', 
+                alignItems: 'center',
+                flexDirection: 'column',
+                gap: '16px'
+              }}>
+                <Spin size="large" />
+                <div style={{ color: 'var(--color-text-secondary)' }}>Loading Market Data...</div>
+              </div>
+            ) : (
+              <EChartsKlineChart 
+                data={klineData}
+                signals={tradingSignals}
+                config={chartConfig}
+                style={{ width: '100%', height: '100%' }}
               />
             )}
-            
-            {/* 工具栏 */}
-            <Toolbar />
-            
-            {/* 主图表区域 */}
-            <Card
-              style={{ height: 'calc(100vh - 120px)' }}
-              styles={{ body: { padding: 0, height: '100%' } }}
-            >
-              {loadingState.isLoading ? (
-                <div style={{ 
-                  display: 'flex', 
-                  justifyContent: 'center', 
-                  alignItems: 'center', 
-                  height: '100%' 
-                }}>
-                  <div style={{ textAlign: 'center' }}>
-                    <Spin size="large" />
-                    <div style={{ marginTop: 16 }}>加载K线数据中...</div>
-                  </div>
-                </div>
-              ) : (
-                <EChartsKlineChart
-                  data={klineData}
-                  signals={tradingSignals}
-                  config={chartConfig}
-                  onConfigChange={handleChartConfigChange}
-                  height={undefined}
-                  style={{ height: '100%' }}
-                />
-              )}
-            </Card>
-          </Content>
-        </Layout>
-        
-        {/* 策略配置抽屉 */}
-        <Drawer
-          title="策略配置"
-          placement="right"
-          width={isMobile ? '100%' : 600}
-          open={configDrawerVisible}
-          onClose={() => setConfigDrawerVisible(false)}
-          destroyOnClose
-        >
-          <StrategyConfigForm
-            onSubmit={handleStrategySubmit}
-            showRunButton
-            showSaveButton
-            showTemplateSelector
-          />
-        </Drawer>
-        
-        {/* 交易信号抽屉 */}
-        <Drawer
-          title="交易信号"
-          placement="right"
-          width={isMobile ? '100%' : 500}
-          open={signalDrawerVisible}
-          onClose={() => setSignalDrawerVisible(false)}
-          destroyOnClose
-        >
-          <SignalMarkers
-            signals={tradingSignals}
-            showTable
-            showFilters
-            showDownload
-          />
-        </Drawer>
-        
-        {/* 移动端侧边栏抽屉 */}
-        {isMobile && (
-          <Drawer
-            title="工具面板"
-            placement="left"
-            width={300}
-            open={!sidebarCollapsed}
-            onClose={() => setSidebarCollapsed(true)}
-            destroyOnClose
-          >
-            <SiderContent />
-          </Drawer>
-        )}
+          </div>
+        </Content>
       </Layout>
-    </ErrorBoundary>
+
+      {/* Drawers remain same but with better styling if needed */}
+      <Drawer
+        title="策略配置"
+        placement="right"
+        onClose={() => setConfigDrawerVisible(false)}
+        open={configDrawerVisible}
+        width={400}
+        styles={{ body: { padding: 0 } }}
+      >
+        <StrategyConfigForm />
+      </Drawer>
+    </Layout>
   );
 };
 

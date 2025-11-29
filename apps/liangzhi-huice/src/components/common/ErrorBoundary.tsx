@@ -10,7 +10,6 @@ import {
 import { useUIStore } from '../../stores';
 
 const { Text, Paragraph } = Typography;
-const { Panel } = Collapse;
 
 // 错误信息接口
 interface ErrorInfo {
@@ -88,8 +87,10 @@ const ErrorDetails: React.FC<{
   errorInfo: ErrorInfo;
   errorId: string;
 }> = ({ error, errorInfo, errorId }) => (
-  <Collapse ghost>
-    <Panel header="查看错误详情" key="details">
+  <Collapse ghost items={[{
+    key: 'details',
+    label: '查看错误详情',
+    children: (
       <Space direction="vertical" style={{ width: '100%' }}>
         <div>
           <Text strong>错误ID：</Text>
@@ -137,8 +138,8 @@ const ErrorDetails: React.FC<{
           </div>
         )}
       </Space>
-    </Panel>
-  </Collapse>
+    )
+  }]} />
 );
 
 // ErrorBoundary类组件

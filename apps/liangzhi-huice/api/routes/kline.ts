@@ -22,11 +22,29 @@ interface KlineData {
 }
 
 const resolveH5Path = (): string => {
-  const primary = DEFAULT_CONFIG.data.h5FilePath
-  const backup = DEFAULT_CONFIG.data.h5BackupPath
-  if (primary && fs.existsSync(primary)) return primary
-  if (backup && fs.existsSync(backup)) return backup
-  throw new Error(`H5文件不存在: primary=${primary || 'N/A'}, backup=${backup || 'N/A'}`)
+  // @ts-ignore - 临时忽略类型检查，确保运行时兼容性
+  const primary = DEFAULT_CONFIG.h5?.filePath || DEFAULT_CONFIG.data?.h5FilePath
+  // @ts-ignore
+  const backup = DEFAULT_CONFIG.h5?.backupPath || DEFAULT_CONFIG.data?.h5BackupPath
+  
+  // 自动扫描可能的H5文件
+  const possibleFiles = [
+    primary,
+    backup,
+    path.join(__dirname, '..', '..', '..', '..', 'services', 'backtest-engine', 'ETHUSDT_1m_test_2020-01-01_to_2020-01-03.h5'), // Add valid test file
+    path.join(__dirname, '..', '..', '..', '..', 'services', 'backtest-engine', 'ethusdt_1m_2019-11-01_to_2025-06-15.h5'),
+    path.join(__dirname, '..', '..', '..', '..', 'services', 'backtest-engine', 'ETHUSDT_1m_2025-08-09_to_2025-08-09_complete.h5'),
+    path.join(process.cwd(), '..', '..', 'services', 'backtest-engine', 'ethusdt_1m_2019-11-01_to_2025-06-15.h5')
+  ].filter(Boolean) as string[];
+
+  for (const p of possibleFiles) {
+    if (fs.existsSync(p)) {
+      console.log(`[H5] Found data file: ${p}`);
+      return p;
+    }
+  }
+
+  throw new Error(`H5文件不存在: searched=${possibleFiles.join(', ')}`)
 }
 
 const loadH5Data = async (startTime?: number, endTime?: number, limit = 1000): Promise<KlineData[]> => {
@@ -43,10 +61,29 @@ const loadH5Data = async (startTime?: number, endTime?: number, limit = 1000): P
         limit.toString()
       ]
 
-      // 调用Python脚本 - 使用虚拟环境中的Python
-      const pythonExecutable = process.platform === 'win32'
-        ? path.join(process.cwd(), '.venv', 'Scripts', 'python.exe')
-        : path.join(process.cwd(), '.venv', 'bin', 'python')
+      // 调用Python脚本 - 智能查找Python解释器
+      const getPythonExecutable = () => {
+        const possiblePaths = [
+          // 1. 尝试项目根目录的 .venv (假设当前 cwd 是 apps/liangzhi-huice 或其他子目录)
+          path.resolve(process.cwd(), '..', '..', '.venv'),
+          // 2. 尝试当前目录的 .venv
+          path.join(process.cwd(), '.venv'),
+           // 3. 尝试从当前文件位置向上查找
+          path.resolve(__dirname, '..', '..', '..', '..', '.venv')
+        ];
+
+        for (const venvPath of possiblePaths) {
+          const pythonPath = process.platform === 'win32'
+            ? path.join(venvPath, 'Scripts', 'python.exe')
+            : path.join(venvPath, 'bin', 'python');
+          if (fs.existsSync(pythonPath)) return pythonPath;
+        }
+        
+        // 4. 如果都找不到，回退到系统 python
+        return 'python';
+      }
+
+      const pythonExecutable = getPythonExecutable();
 
       const pythonProcess = spawn(pythonExecutable, args)
       let stdout = ''
@@ -92,6 +129,28 @@ const loadH5Data = async (startTime?: number, endTime?: number, limit = 1000): P
     }
   })
 }
+
+// Root endpoint for /api/v1/kline
+router.get('/', async (req: Request, res: Response) => {
+  try {
+    const { start_time, end_time, limit = 1000 } = req.query;
+    const startTime = start_time ? Number(start_time) : (start_time ? new Date(start_time as string).getTime() : undefined);
+    const endTime = end_time ? Number(end_time) : (end_time ? new Date(end_time as string).getTime() : undefined);
+    
+    const data = await loadH5Data(startTime, endTime, Number(limit));
+    
+    res.json({
+      success: true,
+      data
+    });
+  } catch (e) {
+    console.error('[Kline API] Error:', e);
+    res.status(500).json({
+      success: false,
+      error: e instanceof Error ? e.message : '未知错误'
+    });
+  }
+});
 
 // K线数据范围查询接口
 router.get('/range', async (req: Request, res: Response) => {

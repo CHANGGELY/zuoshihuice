@@ -28,7 +28,6 @@ import { StrategyConfig, TimeFrame, StrategyType } from '../../types';
 
 const { Option } = Select;
 const { TextArea } = Input;
-const { Panel } = Collapse;
 
 // 策略配置表单属性
 interface StrategyConfigFormProps {
@@ -440,216 +439,230 @@ export const StrategyConfigForm: React.FC<StrategyConfigFormProps> = ({
         initialValues={config}
         onValuesChange={handleConfigChange}
       >
-        <Collapse defaultActiveKey={['basic', 'parameters']}>
-          {/* 基础配置 */}
-          <Panel header="基础配置" key="basic">
-            <Row gutter={16}>
-              <Col span={12}>
-                <Form.Item
-                  label="策略名称"
-                  name="name"
-                  rules={[{ required: true, message: '请输入策略名称' }]}
-                >
-                  <Input placeholder="请输入策略名称" />
-                </Form.Item>
-              </Col>
-              <Col span={12}>
-                <Form.Item
-                  label="策略类型"
-                  name="type"
-                  rules={[{ required: true, message: '请选择策略类型' }]}
-                >
-                  <Select placeholder="请选择策略类型">
-                    {strategyTypeOptions.map(option => (
-                      <Option key={option.value} value={option.value}>
-                        {option.label}
-                      </Option>
-                    ))}
-                  </Select>
-                </Form.Item>
-              </Col>
-              <Col span={12}>
-                <Form.Item
-                  label="交易对"
-                  name="symbol"
-                  rules={[{ required: true, message: '请输入交易对' }]}
-                >
-                  <Input placeholder="如: ETHUSDT" />
-                </Form.Item>
-              </Col>
-              <Col span={12}>
-                <Form.Item
-                  label="时间周期"
-                  name="timeframe"
-                  rules={[{ required: true, message: '请选择时间周期' }]}
-                >
-                  <Select placeholder="请选择时间周期">
-                    {timeframeOptions.map(option => (
-                      <Option key={option.value} value={option.value}>
-                        {option.label}
-                      </Option>
-                    ))}
-                  </Select>
-                </Form.Item>
-              </Col>
-            </Row>
-          </Panel>
-
-          {/* 策略参数 */}
-          <Panel header="策略参数" key="parameters">
-            <ParameterConfig
-              strategyType={config.type}
-              parameters={config.parameters ?? {}}
-              onChange={handleParametersChange}
-            />
-          </Panel>
-
-          {/* 资金管理 */}
-          <Panel header="资金管理" key="capital">
-            <Row gutter={16}>
-              <Col span={8}>
-                <Form.Item label="初始资金" name="initial_capital">
-                  <InputNumber
-                    min={1000}
-                    max={10000000}
-                    formatter={(value) => `$ ${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
-                    parser={(value) => Number(value!.replace(/\$\s?|(,*)/g, '')) as any}
-                    style={{ width: '100%' }}
-                  />
-                </Form.Item>
-              </Col>
-              <Col span={8}>
-                <Form.Item label="手续费率" name="commission">
-                  <InputNumber
-                    min={0}
-                    max={0.01}
-                    step={0.0001}
-                    formatter={(value) => `${(value! * 100).toFixed(2)}%`}
-                    parser={(value) => Number(value!.replace('%', '')) / 100 as any}
-                    style={{ width: '100%' }}
-                  />
-                </Form.Item>
-              </Col>
-              <Col span={8}>
-                <Form.Item label="滑点" name="slippage">
-                  <InputNumber
-                    min={0}
-                    max={0.001}
-                    step={0.00001}
-                    formatter={(value) => `${(value! * 100).toFixed(3)}%`}
-                    parser={(value) => Number(value!.replace('%', '')) / 100 as any}
-                    style={{ width: '100%' }}
-                  />
-                </Form.Item>
-              </Col>
-            </Row>
-          </Panel>
-
-          {/* 风险管理 */}
-          <Panel header="风险管理" key="risk">
-            <Row gutter={16}>
-              <Col span={8}>
-                <Form.Item label="止损比例" name="stop_loss">
-                  <InputNumber
-                    min={0.001}
-                    max={0.5}
-                    step={0.001}
-                    formatter={(value) => `${(value! * 100).toFixed(1)}%`}
-                    parser={(value) => Number(value!.replace('%', '')) / 100 as any}
-                    style={{ width: '100%' }}
-                  />
-                </Form.Item>
-              </Col>
-              <Col span={8}>
-                <Form.Item label="止盈比例" name="take_profit">
-                  <InputNumber
-                    min={0.001}
-                    max={1}
-                    step={0.001}
-                    formatter={(value) => `${(value! * 100).toFixed(1)}%`}
-                    parser={(value) => Number(value!.replace('%', '')) / 100 as any}
-                    style={{ width: '100%' }}
-                  />
-                </Form.Item>
-              </Col>
-              <Col span={8}>
-                <Form.Item label="最大仓位" name="max_position_size">
-                  <InputNumber
-                    min={0.1}
-                    max={1}
-                    step={0.1}
-                    formatter={(value) => `${(value! * 100).toFixed(0)}%`}
-                    parser={(value) => Number(value!.replace('%', '')) / 100 as any}
-                    style={{ width: '100%' }}
-                  />
-                </Form.Item>
-              </Col>
-              <Col span={8}>
-                <Form.Item label="最大回撤" name={['risk_management', 'max_drawdown']}>
-                  <InputNumber
-                    min={0.01}
-                    max={0.5}
-                    step={0.01}
-                    formatter={(value) => `${(value! * 100).toFixed(0)}%`}
-                    parser={(value) => Number(value!.replace('%', '')) / 100 as any}
-                    style={{ width: '100%' }}
-                  />
-                </Form.Item>
-              </Col>
-              <Col span={8}>
-                <Form.Item label="单笔风险" name={['risk_management', 'risk_per_trade']}>
-                  <InputNumber
-                    min={0.001}
-                    max={0.1}
-                    step={0.001}
-                    formatter={(value) => `${(value! * 100).toFixed(1)}%`}
-                    parser={(value) => Number(value!.replace('%', '')) / 100 as any}
-                    style={{ width: '100%' }}
-                  />
-                </Form.Item>
-              </Col>
-              <Col span={8}>
-                <Form.Item label="仓位管理" name={['risk_management', 'position_sizing']}>
-                  <Select
-                    style={{ width: '100%' }}
-                  >
-                    <Option value="fixed">固定仓位</Option>
-                    <Option value="percent_risk">风险百分比</Option>
-                    <Option value="kelly">凯利公式</Option>
-                  </Select>
-                </Form.Item>
-              </Col>
-            </Row>
-          </Panel>
-
-          {/* 过滤条件 */}
-          <Panel header="过滤条件" key="filters">
-            <Row gutter={16}>
-              <Col span={12}>
-                <Form.Item label="最小成交量" name={['filters', 'min_volume']}>
-                  <InputNumber
-                    min={0}
-                    formatter={(value) => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
-                    parser={(value) => Number(value!.replace(/,/g, '')) as any}
-                    style={{ width: '100%' }}
-                  />
-                </Form.Item>
-              </Col>
-              <Col span={12}>
-                <Form.Item label="波动率阈值" name={['filters', 'volatility_threshold']}>
-                  <InputNumber
-                    min={0}
-                    max={1}
-                    step={0.001}
-                    formatter={(value) => `${(value! * 100).toFixed(1)}%`}
-                    parser={(value) => Number(value!.replace('%', '')) / 100 as any}
-                    style={{ width: '100%' }}
-                  />
-                </Form.Item>
-              </Col>
-            </Row>
-          </Panel>
-        </Collapse>
+        <Collapse 
+          defaultActiveKey={['basic', 'parameters']}
+          items={[
+            {
+              key: 'basic',
+              label: '基础配置',
+              children: (
+                <Row gutter={16}>
+                  <Col span={12}>
+                    <Form.Item
+                      label="策略名称"
+                      name="name"
+                      rules={[{ required: true, message: '请输入策略名称' }]}
+                    >
+                      <Input placeholder="请输入策略名称" />
+                    </Form.Item>
+                  </Col>
+                  <Col span={12}>
+                    <Form.Item
+                      label="策略类型"
+                      name="type"
+                      rules={[{ required: true, message: '请选择策略类型' }]}
+                    >
+                      <Select placeholder="请选择策略类型">
+                        {strategyTypeOptions.map(option => (
+                          <Option key={option.value} value={option.value}>
+                            {option.label}
+                          </Option>
+                        ))}
+                      </Select>
+                    </Form.Item>
+                  </Col>
+                  <Col span={12}>
+                    <Form.Item
+                      label="交易对"
+                      name="symbol"
+                      rules={[{ required: true, message: '请输入交易对' }]}
+                    >
+                      <Input placeholder="如: ETHUSDT" />
+                    </Form.Item>
+                  </Col>
+                  <Col span={12}>
+                    <Form.Item
+                      label="时间周期"
+                      name="timeframe"
+                      rules={[{ required: true, message: '请选择时间周期' }]}
+                    >
+                      <Select placeholder="请选择时间周期">
+                        {timeframeOptions.map(option => (
+                          <Option key={option.value} value={option.value}>
+                            {option.label}
+                          </Option>
+                        ))}
+                      </Select>
+                    </Form.Item>
+                  </Col>
+                </Row>
+              )
+            },
+            {
+              key: 'parameters',
+              label: '策略参数',
+              children: (
+                <ParameterConfig
+                  strategyType={config.type}
+                  parameters={config.parameters ?? {}}
+                  onChange={handleParametersChange}
+                />
+              )
+            },
+            {
+              key: 'capital',
+              label: '资金管理',
+              children: (
+                <Row gutter={16}>
+                  <Col span={8}>
+                    <Form.Item label="初始资金" name="initial_capital">
+                      <InputNumber
+                        min={1000}
+                        max={10000000}
+                        formatter={(value) => `$ ${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
+                        parser={(value) => Number(value!.replace(/\$\s?|(,*)/g, '')) as any}
+                        style={{ width: '100%' }}
+                      />
+                    </Form.Item>
+                  </Col>
+                  <Col span={8}>
+                    <Form.Item label="手续费率" name="commission">
+                      <InputNumber
+                        min={0}
+                        max={0.01}
+                        step={0.0001}
+                        formatter={(value) => `${(value! * 100).toFixed(2)}%`}
+                        parser={(value) => Number(value!.replace('%', '')) / 100 as any}
+                        style={{ width: '100%' }}
+                      />
+                    </Form.Item>
+                  </Col>
+                  <Col span={8}>
+                    <Form.Item label="滑点" name="slippage">
+                      <InputNumber
+                        min={0}
+                        max={0.001}
+                        step={0.00001}
+                        formatter={(value) => `${(value! * 100).toFixed(3)}%`}
+                        parser={(value) => Number(value!.replace('%', '')) / 100 as any}
+                        style={{ width: '100%' }}
+                      />
+                    </Form.Item>
+                  </Col>
+                </Row>
+              )
+            },
+            {
+              key: 'risk',
+              label: '风险管理',
+              children: (
+                <Row gutter={16}>
+                  <Col span={8}>
+                    <Form.Item label="止损比例" name="stop_loss">
+                      <InputNumber
+                        min={0.001}
+                        max={0.5}
+                        step={0.001}
+                        formatter={(value) => `${(value! * 100).toFixed(1)}%`}
+                        parser={(value) => Number(value!.replace('%', '')) / 100 as any}
+                        style={{ width: '100%' }}
+                      />
+                    </Form.Item>
+                  </Col>
+                  <Col span={8}>
+                    <Form.Item label="止盈比例" name="take_profit">
+                      <InputNumber
+                        min={0.001}
+                        max={1}
+                        step={0.001}
+                        formatter={(value) => `${(value! * 100).toFixed(1)}%`}
+                        parser={(value) => Number(value!.replace('%', '')) / 100 as any}
+                        style={{ width: '100%' }}
+                      />
+                    </Form.Item>
+                  </Col>
+                  <Col span={8}>
+                    <Form.Item label="最大仓位" name="max_position_size">
+                      <InputNumber
+                        min={0.1}
+                        max={1}
+                        step={0.1}
+                        formatter={(value) => `${(value! * 100).toFixed(0)}%`}
+                        parser={(value) => Number(value!.replace('%', '')) / 100 as any}
+                        style={{ width: '100%' }}
+                      />
+                    </Form.Item>
+                  </Col>
+                  <Col span={8}>
+                    <Form.Item label="最大回撤" name={['risk_management', 'max_drawdown']}>
+                      <InputNumber
+                        min={0.01}
+                        max={0.5}
+                        step={0.01}
+                        formatter={(value) => `${(value! * 100).toFixed(0)}%`}
+                        parser={(value) => Number(value!.replace('%', '')) / 100 as any}
+                        style={{ width: '100%' }}
+                      />
+                    </Form.Item>
+                  </Col>
+                  <Col span={8}>
+                    <Form.Item label="单笔风险" name={['risk_management', 'risk_per_trade']}>
+                      <InputNumber
+                        min={0.001}
+                        max={0.1}
+                        step={0.001}
+                        formatter={(value) => `${(value! * 100).toFixed(1)}%`}
+                        parser={(value) => Number(value!.replace('%', '')) / 100 as any}
+                        style={{ width: '100%' }}
+                      />
+                    </Form.Item>
+                  </Col>
+                  <Col span={8}>
+                    <Form.Item label="仓位管理" name={['risk_management', 'position_sizing']}>
+                      <Select
+                        style={{ width: '100%' }}
+                      >
+                        <Option value="fixed">固定仓位</Option>
+                        <Option value="percent_risk">风险百分比</Option>
+                        <Option value="kelly">凯利公式</Option>
+                      </Select>
+                    </Form.Item>
+                  </Col>
+                </Row>
+              )
+            },
+            {
+              key: 'filters',
+              label: '过滤条件',
+              children: (
+                <Row gutter={16}>
+                  <Col span={12}>
+                    <Form.Item label="最小成交量" name={['filters', 'min_volume']}>
+                      <InputNumber
+                        min={0}
+                        formatter={(value) => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
+                        parser={(value) => Number(value!.replace(/,/g, '')) as any}
+                        style={{ width: '100%' }}
+                      />
+                    </Form.Item>
+                  </Col>
+                  <Col span={12}>
+                    <Form.Item label="波动率阈值" name={['filters', 'volatility_threshold']}>
+                      <InputNumber
+                        min={0}
+                        max={1}
+                        step={0.001}
+                        formatter={(value) => `${(value! * 100).toFixed(1)}%`}
+                        parser={(value) => Number(value!.replace('%', '')) / 100 as any}
+                        style={{ width: '100%' }}
+                      />
+                    </Form.Item>
+                  </Col>
+                </Row>
+              )
+            }
+          ]}
+        />
 
         <Divider />
 

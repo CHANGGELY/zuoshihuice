@@ -2,8 +2,10 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const repoRoot = path.resolve(__dirname, '..', '..');
-const backtestDataDir = path.resolve(repoRoot, '..', 'services', 'backtest-engine');
+// 从 api/config 到 apps/liangzhi-huice 需要向上两层
+// 从 apps/liangzhi-huice 到 repo root 需要再向上两层 (apps -> root)
+const repoRoot = path.resolve(__dirname, '..', '..', '..', '..');
+const backtestDataDir = path.resolve(repoRoot, 'services', 'backtest-engine');
 const defaultH5Path = path.resolve(backtestDataDir, 'ethusdt_1m_2019-11-01_to_2025-06-15.h5');
 
 export const DEFAULT_CONFIG = {

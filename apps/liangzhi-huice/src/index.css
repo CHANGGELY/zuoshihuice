@@ -1,50 +1,189 @@
+/* Design System & Variables */
+:root {
+  /* Color Palette - Modern & Sophisticated */
+  --primary-hue: 225;
+  --primary-sat: 80%;
+  --primary-light: 60%;
+  
+  --color-primary: hsl(var(--primary-hue), var(--primary-sat), var(--primary-light));
+  --color-primary-hover: hsl(var(--primary-hue), var(--primary-sat), 50%);
+  --color-primary-active: hsl(var(--primary-hue), var(--primary-sat), 40%);
+  --color-primary-soft: hsl(var(--primary-hue), var(--primary-sat), 96%);
+  
+  --color-text-main: hsl(220, 20%, 20%);
+  --color-text-secondary: hsl(220, 15%, 45%);
+  --color-text-tertiary: hsl(220, 10%, 65%);
+  
+  --color-bg-body: hsl(220, 30%, 98%);
+  --color-bg-surface: rgba(255, 255, 255, 0.85);
+  --color-bg-surface-hover: rgba(255, 255, 255, 0.95);
+  
+  --color-border: hsl(220, 20%, 90%);
+  
+  --color-success: hsl(150, 60%, 45%);
+  --color-warning: hsl(40, 90%, 60%);
+  --color-error: hsl(0, 70%, 60%);
+  
+  /* Effects */
+  --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.05);
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.05), 0 4px 12px rgba(0, 0, 0, 0.02);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 10px 30px -5px rgba(0, 0, 0, 0.03);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.05), 0 20px 40px -5px rgba(0, 0, 0, 0.04);
+  
+  --backdrop-blur: blur(12px);
+  --transition-base: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  
+  /* Typography */
+  --font-sans: 'Outfit', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+[data-theme='dark'] {
+  --color-text-main: hsl(220, 20%, 95%);
+  --color-text-secondary: hsl(220, 15%, 75%);
+  --color-text-tertiary: hsl(220, 10%, 55%);
+  
+  --color-bg-body: hsl(222, 47%, 11%);
+  --color-bg-surface: rgba(30, 41, 59, 0.7);
+  --color-bg-surface-hover: rgba(30, 41, 59, 0.85);
+  
+  --color-border: hsl(217, 33%, 25%);
+  
+  --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.3);
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.3), 0 4px 12px rgba(0, 0, 0, 0.2);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.4), 0 10px 30px -5px rgba(0, 0, 0, 0.3);
+}
+
+/* Global Reset & Base Styles */
 * {
   margin: 0;
   padding: 0;
   box-sizing: border-box;
+  outline-color: var(--color-primary);
 }
 
 body {
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
-    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
-    sans-serif;
+  font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  background-color: #f5f5f5;
-  color: #333;
+  background-color: var(--color-bg-body);
+  color: var(--color-text-main);
   line-height: 1.6;
-}
-
-code {
-  font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
-    monospace;
+  transition: background-color 0.5s ease, color 0.3s ease;
+  overflow-x: hidden;
 }
 
 #root {
   min-height: 100vh;
+  display: flex;
+  flex-direction: column;
 }
 
-/* 滚动条样式 */
+/* Custom Scrollbar */
 ::-webkit-scrollbar {
-  width: 8px;
+  width: 6px;
+  height: 6px;
 }
 
 ::-webkit-scrollbar-track {
-  background: #f1f1f1;
+  background: transparent;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #888;
-  border-radius: 4px;
+  background: var(--color-text-tertiary);
+  border-radius: 3px;
+  opacity: 0.5;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #555;
+  background: var(--color-text-secondary);
 }
 
-/* 响应式设计 */
-@media (max-width: 768px) {
-  body {
-    font-size: 14px;
-  }
+/* Utility Classes */
+.glass-panel {
+  background: var(--color-bg-surface);
+  backdrop-filter: var(--backdrop-blur);
+  -webkit-backdrop-filter: var(--backdrop-blur);
+  border: 1px solid var(--color-border);
+  border-radius: 16px;
+  box-shadow: var(--shadow-sm);
 }
+
+.glass-panel:hover {
+  box-shadow: var(--shadow-md);
+  background: var(--color-bg-surface-hover);
+  transition: var(--transition-base);
+}
+
+.text-gradient {
+  background: linear-gradient(135deg, var(--color-primary), hsl(260, 80%, 60%));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* Ant Design Overrides for Aesthetic */
+.ant-layout {
+  background: transparent !important;
+}
+
+.ant-layout-header {
+  background: var(--color-bg-surface) !important;
+  backdrop-filter: var(--backdrop-blur);
+  border-bottom: 1px solid var(--color-border);
+  padding: 0 24px;
+  height: 64px;
+  display: flex;
+  align-items: center;
+  box-shadow: var(--shadow-xs);
+  z-index: 10;
+}
+
+.ant-layout-sider {
+  background: var(--color-bg-surface) !important;
+  border-right: 1px solid var(--color-border);
+}
+
+.ant-menu {
+  background: transparent !important;
+  border-right: none !important;
+}
+
+.ant-card {
+  background: var(--color-bg-surface) !important;
+  backdrop-filter: var(--backdrop-blur);
+  border-radius: 16px !important;
+  border: 1px solid var(--color-border) !important;
+  box-shadow: var(--shadow-sm) !important;
+  transition: var(--transition-base) !important;
+}
+
+.ant-card:hover {
+  box-shadow: var(--shadow-md) !important;
+  transform: translateY(-2px);
+}
+
+.ant-btn-primary {
+  background: linear-gradient(135deg, var(--color-primary), hsl(240, 70%, 60%)) !important;
+  border: none !important;
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+  transition: var(--transition-base);
+}
+
+.ant-btn-primary:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 16px rgba(59, 130, 246, 0.4);
+}
+
+/* Animation Utilities */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.5s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+
+.animate-delay-100 { animation-delay: 0.1s; }
+.animate-delay-200 { animation-delay: 0.2s; }
+.animate-delay-300 { animation-delay: 0.3s; }
