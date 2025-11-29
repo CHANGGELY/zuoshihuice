@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="640" height="160" viewBox="0 0 640 160">
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#5b8cff"/>
+      <stop offset="100%" stop-color="#22d3ee"/>
+    </linearGradient>
+  </defs>
+  <rect x="0" y="0" width="640" height="160" rx="20" fill="#0b1220"/>
+  <g transform="translate(24,24)">
+    <circle cx="56" cy="56" r="48" fill="url(#g)" opacity="0.25"/>
+    <path d="M16 96 C 40 40, 72 40, 96 96" stroke="url(#g)" stroke-width="6" fill="none"/>
+    <path d="M24 88 L 56 56 L 88 88" stroke="#a5b4fc" stroke-width="3" fill="none" opacity="0.9"/>
+    <circle cx="56" cy="56" r="6" fill="#22d3ee"/>
+  </g>
+  <g transform="translate(150,52)" fill="#e5e7eb">
+    <text x="0" y="0" font-size="24" font-weight="600">量智回测平台</text>
+    <text x="0" y="36" font-size="16" fill="#94a3b8">Liangzhi Backtest Platform</text>
+  </g>
+</svg>
