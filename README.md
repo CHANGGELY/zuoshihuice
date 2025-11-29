@@ -63,7 +63,7 @@ Liangzhi Backtest Platform is a professional backtesting system for perpetual ma
 ### 前端 K 线信号（真实数据与交互）
 
 <p align="center">
-  <img src="docs/kline-signal-2025-11-30-2025-11-29T21-29-31-383Z.png" alt="Kline Signal" width="720">
+  <img src="docs/kline-signal-2025-11-29T20-49-02-811Z.png" alt="Kline Signal" width="720">
 </p>
 
 
