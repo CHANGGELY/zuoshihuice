@@ -4,11 +4,11 @@
 
 # 量智回测平台 · Liangzhi Backtest Platform
 
-[![Stars](https://img.shields.io/github/stars/CHANGGELY/zuoshihuice?style=social)](https://github.com/CHANGGELY/zuoshihuice)
-[![Forks](https://img.shields.io/github/forks/CHANGGELY/zuoshihuice?style=social)](https://github.com/CHANGGELY/zuoshihuice/forks)
-[![Issues](https://img.shields.io/github/issues/CHANGGELY/zuoshihuice)](https://github.com/CHANGGELY/zuoshihuice/issues)
-[![Last Commit](https://img.shields.io/github/last-commit/CHANGGELY/zuoshihuice)](https://github.com/CHANGGELY/zuoshihuice/commits/master)
-[![CI](https://github.com/CHANGGELY/zuoshihuice/actions/workflows/ci.yml/badge.svg)](https://github.com/CHANGGELY/zuoshihuice/actions/workflows/ci.yml)
+[![Stars](https://img.shields.io/github/stars/CHANGGELY/liangzhi-backtest?style=social)](https://github.com/CHANGGELY/liangzhi-backtest)
+[![Forks](https://img.shields.io/github/forks/CHANGGELY/liangzhi-backtest?style=social)](https://github.com/CHANGGELY/liangzhi-backtest/forks)
+[![Issues](https://img.shields.io/github/issues/CHANGGELY/liangzhi-backtest)](https://github.com/CHANGGELY/liangzhi-backtest/issues)
+[![Last Commit](https://img.shields.io/github/last-commit/CHANGGELY/liangzhi-backtest)](https://github.com/CHANGGELY/liangzhi-backtest/commits/master)
+[![CI](https://github.com/CHANGGELY/liangzhi-backtest/actions/workflows/ci.yml/badge.svg)](https://github.com/CHANGGELY/liangzhi-backtest/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
 一个面向永续合约做市与网格类策略的专业回测平台，融合 React + Vite 前端、Node.js API 与 Python 回测引擎，支持 ATR 自适应网格策略，强调数据完整性与可视化分析体验。
