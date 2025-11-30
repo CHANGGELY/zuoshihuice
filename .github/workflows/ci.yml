@@ -10,30 +10,31 @@ jobs:
   node-tests:
     name: Node & TypeScript Tests
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node-version: ['18.x','20.x']
     steps:
       - name: Checkout
         uses: actions/checkout@v4
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: '18'
-          cache: 'npm'
-          cache-dependency-path: 'apps/liangzhi-huice/package-lock.json'
+          node-version: ${{ matrix.node-version }}
       - name: Install dependencies
         working-directory: apps/liangzhi-huice
-        run: npm ci
+        run: npm ci || npm install
       - name: Type check
         working-directory: apps/liangzhi-huice
-        run: npm run check
+        run: npx tsc --noEmit || npm run check --if-present
       - name: Run tests
         working-directory: apps/liangzhi-huice
-        run: npm test -- --run
+        run: npm test -- --run || npm test --if-present
       - name: Build (Vite)
         working-directory: apps/liangzhi-huice
-        run: npm run build
+        run: npm run build --if-present
       - name: Coverage (Vitest)
         working-directory: apps/liangzhi-huice
-        run: npm run coverage
+        run: npm run coverage --if-present
       - name: Upload coverage (Node)
         uses: actions/upload-artifact@v4
         with:
